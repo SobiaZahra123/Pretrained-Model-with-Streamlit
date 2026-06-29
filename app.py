@@ -1,612 +1,546 @@
-# ================================================================
-#  NLP Quiz – Text/Word Similarity App
-#  Model  : all-MiniLM-L6-v2  (free, no training, no preprocessing)
-#  Deploy : Streamlit Community Cloud
-# ================================================================
+"""
+app.py
+======
+NLP Semantic Similarity Explorer — Main Streamlit Application
 
-import streamlit as st
+Entry point for the entire app. Run with:
+    streamlit run app.py
+
+Requirements: see requirements.txt
+Model used  : sentence-transformers/all-MiniLM-L6-v2 (free, Apache 2.0)
+No preprocessing · No tokenization · No model training
+"""
+
 import numpy as np
+import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
 import seaborn as sns
+from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 import pandas as pd
+import time
+import plotly.graph_objects as go
+import plotly.express as px
+from io import BytesIO
+import base64
 
-# ── Page config ──────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────
+#  Page Configuration
+# ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="NLP Similarity Explorer",
-    page_icon="🔍",
-    layout="wide"
+    page_icon="🔮",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ──────────────────────────────────────────────
-st.markdown("""
-<style>
-    .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    }
-    
-    .card {
-        background: rgba(255,255,255,0.9);
-        backdrop-filter: blur(10px);
-        border-radius: 16px;
-        padding: 1.5rem;
-        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
-        border: 1px solid rgba(255,255,255,0.3);
-        transition: all 0.3s ease;
-        margin-bottom: 1.2rem;
-    }
-    .card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 48px rgba(31, 38, 135, 0.25);
-    }
-    
-    .header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.8rem 2rem;
-        border-radius: 16px;
-        color: white;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
-    }
-    .header h1 {
-        margin: 0;
-        font-size: 2rem;
-        font-weight: 700;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .header p {
-        margin: 0.3rem 0 0 0;
-        opacity: 0.9;
-        font-size: 0.95rem;
-    }
-    .header .tag {
-        display: inline-block;
-        background: rgba(255,255,255,0.2);
-        backdrop-filter: blur(5px);
-        padding: 0.2rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.7rem;
-        margin-right: 0.4rem;
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 12px;
-        padding: 0.6rem 2rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
-    }
-    
-    .query-box {
-        background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-        padding: 0.8rem 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #667eea;
-        margin: 0.3rem 0;
-    }
-    .query-box strong {
-        color: #667eea;
-    }
-    
-    .candidate-item {
-        padding: 0.5rem 0.8rem;
-        margin: 0.2rem 0;
-        border-radius: 6px;
-        background: #f8f9fa;
-        border-left: 3px solid #dee2e6;
-        transition: all 0.2s ease;
-        color: #2d3436;
-        font-size: 0.9rem;
-    }
-    .candidate-item:hover {
-        background: #e9ecef;
-        border-left-color: #667eea;
-        transform: translateX(4px);
-    }
-    .candidate-item .num {
-        display: inline-block;
-        width: 24px;
-        height: 24px;
-        line-height: 24px;
-        text-align: center;
-        background: #667eea;
-        color: white;
-        border-radius: 50%;
-        font-size: 0.7rem;
-        font-weight: 700;
-        margin-right: 0.5rem;
-    }
-    
-    .metric-box {
-        background: white;
-        padding: 0.8rem 1rem;
-        border-radius: 12px;
-        text-align: center;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        border: 1px solid #e9ecef;
-        transition: all 0.3s ease;
-    }
-    .metric-box:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-    }
-    .metric-box .value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .metric-box .label {
-        font-size: 0.7rem;
-        color: #6c757d;
-        margin-top: 0.1rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .progress-container {
-        width: 100%;
-        height: 6px;
-        background: #e9ecef;
-        border-radius: 3px;
-        overflow: hidden;
-        margin-top: 0.2rem;
-    }
-    .progress-bar-custom {
-        height: 100%;
-        border-radius: 3px;
-        transition: width 1s ease;
-    }
-    
-    .result-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid #f0f2f6;
-        font-size: 0.9rem;
-        transition: all 0.2s ease;
-    }
-    .result-row:hover {
-        background: #f8f9fa;
-        padding-left: 0.5rem;
-        border-radius: 4px;
-    }
-    .result-row .rank {
-        color: #6c757d;
-        width: 30px;
-        font-weight: 600;
-    }
-    .result-row .text {
-        flex: 1;
-        color: #2d3436;
-    }
-    .result-row .score {
-        font-weight: 700;
-        color: #667eea;
-        width: 80px;
-        text-align: right;
-    }
-    
-    .info-box {
-        background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
-        border-left: 4px solid #667eea;
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 1rem 0;
-        color: #2d3436;
-    }
-    
-    .footer {
-        text-align: center;
-        color: #6c757d;
-        font-size: 0.75rem;
-        padding: 1rem 0;
-        border-top: 1px solid #dee2e6;
-        margin-top: 2rem;
-    }
-    
-    /* Paul's Standards Score Card */
-    .score-card {
-        display: inline-block;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        font-weight: 700;
-        font-size: 1.2rem;
-        min-width: 60px;
-        text-align: center;
-    }
-    .score-high {
-        background: #00b894;
-        color: white;
-    }
-    .score-good {
-        background: #fdcb6e;
-        color: #2d3436;
-    }
-    .score-low {
-        background: #fd79a8;
-        color: white;
-    }
-</style>
-""", unsafe_allow_html=True)
+# ──────────────────────────────────────────────────────────────
+#  Constants
+# ──────────────────────────────────────────────────────────────
+MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_DIM = 384
+MODEL_INFO = {
+    "name": MODEL_NAME,
+    "dimension": MODEL_DIM,
+    "type": "Sentence Transformer",
+    "tokens": "512",
+    "language": "English (multilingual support)",
+    "license": "Apache 2.0",
+    "paper": "https://arxiv.org/abs/1908.10084",
+}
 
-# ── Header ─────────────────────────────────────────────────────
-st.markdown("""
-<div class="header">
-    <h1>🔍 NLP Text Similarity Explorer</h1>
-    <p>Powered by <strong>all-MiniLM-L6-v2</strong> — free pretrained sentence embedding model</p>
-    <div style="margin-top: 0.6rem;">
-        <span class="tag">✨ No Preprocessing</span>
-        <span class="tag">🎯 No Training</span>
-        <span class="tag">🚀 No Paid API</span>
-        <span class="tag">📊 2 Visualizations</span>
-        <span class="tag">🧠 Paul's Standards</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# ──────────────────────────────────────────────────────────────
+#  Custom CSS
+# ──────────────────────────────────────────────────────────────
+def inject_css():
+    st.markdown("""
+    <style>
+        /* ── Google Fonts ── */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700&family=JetBrains+Mono&display=swap');
 
-# ── Load model ────────────────────────────────────────────────
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* ── Glassmorphism Base ── */
+        .glass {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            transition: all 0.25s ease;
+        }
+
+        .glass:hover {
+            border-color: rgba(255, 255, 255, 0.13);
+            box-shadow: 0 24px 70px rgba(0,0,0,0.5);
+        }
+
+        /* ── Floating blobs ── */
+        .stApp {
+            background: #0b0b14;
+            background-image:
+                radial-gradient(ellipse at 10% 20%, rgba(88, 70, 255, 0.09) 0%, transparent 60%),
+                radial-gradient(ellipse at 90% 80%, rgba(255, 70, 200, 0.07) 0%, transparent 60%);
+        }
+
+        /* ── Score rings ── */
+        .score-ring {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: conic-gradient(from 0deg, #6C63FF var(--pct), rgba(255,255,255,0.06) var(--pct));
+            color: white;
+        }
+
+        /* ── Other utilities ── */
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .text-muted { color: #8e8ea0; font-size: 0.9rem; }
+        .divider { border: 0; border-top: 1px solid rgba(255,255,255,0.07); margin: 2rem 0; }
+
+        h1, h2, h3 { color: #f0f0f8; letter-spacing: -0.02em; }
+        p, li, .stMarkdown { color: #c8c8d8; }
+        .stButton > button {
+            background: linear-gradient(135deg, #6C63FF, #5A52D5);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .stButton > button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 30px rgba(108, 99, 255, 0.4);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────────────────────
+#  Model Loader
+# ──────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
+    return SentenceTransformer(MODEL_NAME)
 
-with st.spinner("🔄 Loading pretrained model (all-MiniLM-L6-v2)…"):
-    model = load_model()
+# ──────────────────────────────────────────────────────────────
+#  Utility Functions
+# ──────────────────────────────────────────────────────────────
+def init_session_state():
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    if "current" not in st.session_state:
+        st.session_state.current = None
+    if "theme" not in st.session_state:
+        st.session_state.theme = "dark"
+    if "text_inputs" not in st.session_state:
+        st.session_state.text_inputs = {}
 
-st.success("✅ Model loaded: all-MiniLM-L6-v2")
+def save_to_history(texts, all_scores, primary_score, elapsed_ms):
+    st.session_state.history.append({
+        "texts": texts,
+        "all_scores": all_scores,
+        "primary_score": primary_score,
+        "elapsed_ms": elapsed_ms,
+        "timestamp": time.time(),
+    })
 
-# ── Sidebar ────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## ✍️ Input")
-    st.markdown("Enter one sentence/word per line (min 2, max 10).")
-    
-    default_text = (
-        "Artificial intelligence is changing the world\n"
-        "Machine learning helps computers learn from data\n"
-        "Deep learning uses neural networks\n"
-        "Natural language processing handles text\n"
-        "Computer vision processes images\n"
-        "Robotics involves autonomous machines"
-    )
-    
-    raw_input = st.text_area(
-        "",
-        value=default_text,
-        height=220,
-        label_visibility="collapsed"
-    )
-    
-    run_btn = st.button("▶ Compute Similarity", type="primary", use_container_width=True)
-    
-    st.markdown("---")
-    st.markdown("""
-    **Model Details:**  
-    `all-MiniLM-L6-v2`  
-    *Sentence-Transformers*  
-    *Free & Pretrained*
-    """)
+def get_history_df():
+    if not st.session_state.history:
+        return pd.DataFrame()
+    records = []
+    for i, h in enumerate(st.session_state.history):
+        records.append({
+            "Run #": i + 1,
+            "Primary Score": f"{h['primary_score']:.4f}",
+            "Pairs": len(h['all_scores']),
+            "Texts": " | ".join(h['texts'][:3]) + ("..." if len(h['texts']) > 3 else ""),
+            "Time (ms)": f"{h['elapsed_ms']:.1f}",
+        })
+    return pd.DataFrame(records)
 
-# ── Function to calculate Paul's Standards Scores ────────────
-def calculate_paul_scores(sentences, results, query, similarities, sim_matrix, n):
-    """Calculate percentage scores for each of Paul's Critical Thinking Standards"""
-    
-    top_score = results[0]['Similarity Score'] if results else 0
-    top_candidate = results[0]['Candidate'] if results else ""
-    bot_score = results[-1]['Similarity Score'] if results else 0
-    
+def clear_history():
+    st.session_state.history = []
+
+def format_vector(vec, dims=8):
+    return "[" + ", ".join([f"{v:.4f}" for v in vec[:dims]]) + (" ..." if len(vec) > dims else "") + "]"
+
+def similarity_label(score):
+    if score >= 0.75:
+        return "🔵 Very Similar", "#6C63FF"
+    elif score >= 0.55:
+        return "🟢 Similar", "#4ECB71"
+    elif score >= 0.35:
+        return "🟡 Moderately Similar", "#F9A826"
+    else:
+        return "🔴 Dissimilar", "#FF6B6B"
+
+def compute_paul_scores(primary_score, all_scores, texts):
     scores = {}
+    n = len(texts)
     
-    # 1. Clarity Score
-    clarity_score = 0
-    if n >= 2:
-        clarity_score += 30
-    if len(query) > 10:
-        clarity_score += 20
-    if len(results) > 0:
-        clarity_score += 20
-    if top_score > 0:
-        clarity_score += 30
-    scores['Clarity'] = min(clarity_score, 100)
+    # Clarity
+    clarity = 30
+    if n >= 2: clarity += 20
+    if n >= 3: clarity += 20
+    if primary_score > 0: clarity += 30
+    scores["Clarity"] = min(clarity, 100)
     
-    # 2. Accuracy Score
-    accuracy_score = 0
-    if n >= 2:
-        accuracy_score += 25
-    if top_score > 0:
-        accuracy_score += 25
-    if sim_matrix.shape[0] > 1:
-        accuracy_score += 25
-    if len(results) > 0:
-        accuracy_score += 25
-    scores['Accuracy'] = min(accuracy_score, 100)
+    # Accuracy
+    accuracy = 25
+    if n >= 2: accuracy += 25
+    if primary_score > 0: accuracy += 25
+    if len(all_scores) > 1: accuracy += 25
+    scores["Accuracy"] = min(accuracy, 100)
     
-    # 3. Precision Score
-    precision_score = 0
-    if top_score > 0.7:
-        precision_score += 40
-    elif top_score > 0.5:
-        precision_score += 25
-    else:
-        precision_score += 10
+    # Precision
+    precision = 10
+    if primary_score > 0.7: precision += 40
+    elif primary_score > 0.5: precision += 25
+    if len(all_scores) >= 2: precision += 20
+    if max(all_scores) - min(all_scores) > 0.3: precision += 20
+    scores["Precision"] = min(precision, 100)
     
-    if bot_score < 0.3:
-        precision_score += 20
-    elif bot_score < 0.5:
-        precision_score += 10
+    # Relevance
+    relevance = 25
+    if len(all_scores) > 0: relevance += 25
+    if primary_score > 0: relevance += 25
+    if n >= 2: relevance += 25
+    scores["Relevance"] = min(relevance, 100)
     
-    if len(results) >= 3:
-        precision_score += 20
-    elif len(results) >= 2:
-        precision_score += 10
+    # Logic
+    logic = 15
+    if primary_score > 0.5: logic += 30
+    if len(all_scores) >= 2: logic += 25
+    if max(all_scores) > 0 and min(all_scores) < max(all_scores): logic += 30
+    scores["Logic"] = min(logic, 100)
     
-    if len(results) >= 2:
-        diff = results[0]['Similarity Score'] - results[-1]['Similarity Score']
-        if diff > 0.4:
-            precision_score += 20
-        elif diff > 0.2:
-            precision_score += 10
+    # Significance
+    significance = 10
+    if primary_score > 0.7: significance += 50
+    elif primary_score > 0.5: significance += 30
+    if len(all_scores) >= 2: significance += 20
+    if max(all_scores) > min(all_scores): significance += 20
+    scores["Significance"] = min(significance, 100)
     
-    scores['Precision'] = min(precision_score, 100)
-    
-    # 4. Relevance Score
-    relevance_score = 0
-    if len(results) >= 2:
-        relevance_score += 30
-    if top_score > 0:
-        relevance_score += 25
-    if sim_matrix.shape[0] > 1:
-        relevance_score += 25
-    if n >= 2:
-        relevance_score += 20
-    scores['Relevance'] = min(relevance_score, 100)
-    
-    # 5. Logic Score
-    logic_score = 0
-    if top_score > 0.5:
-        logic_score += 30
-    elif top_score > 0.3:
-        logic_score += 15
-    
-    if len(results) >= 3:
-        logic_score += 20
-    elif len(results) >= 2:
-        logic_score += 10
-    
-    if top_score > 0 and bot_score < top_score:
-        logic_score += 25
-    
-    if len(results) >= 2 and top_score > 0.4:
-        logic_score += 25
-    
-    scores['Logic'] = min(logic_score, 100)
-    
-    # 6. Significance Score
-    significance_score = 0
-    if top_score > 0.7:
-        significance_score += 50
-    elif top_score > 0.5:
-        significance_score += 30
-    else:
-        significance_score += 10
-    
-    if len(results) >= 3:
-        significance_score += 25
-    elif len(results) >= 2:
-        significance_score += 15
-    
-    if top_score > 0 and bot_score < top_score:
-        significance_score += 25
-    
-    scores['Significance'] = min(significance_score, 100)
-    
-    # 7. Fairness Score
-    fairness_score = 80  # Base score for acknowledging limitations
-    if n >= 3:
-        fairness_score += 10
-    if len(results) >= 2:
-        fairness_score += 10
-    scores['Fairness'] = min(fairness_score, 100)
+    # Fairness
+    fairness = 70
+    if n >= 3: fairness += 15
+    if len(all_scores) >= 2: fairness += 15
+    scores["Fairness"] = min(fairness, 100)
     
     return scores
 
-# ── Main logic ────────────────────────────────────────────────
-if run_btn:
-
-    sentences = [line.strip() for line in raw_input.strip().split("\n") if line.strip()]
-
-    if len(sentences) < 2:
-        st.error("⚠️ Please enter at least 2 sentences.")
-        st.stop()
-
-    if len(sentences) > 10:
-        sentences = sentences[:10]
-        st.warning("⚠️ Using first 10 sentences only.")
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 📋 Input Sentences")
+# ──────────────────────────────────────────────────────────────
+#  Graph Functions
+# ──────────────────────────────────────────────────────────────
+def bar_chart_top_similar(top_results):
+    if not top_results:
+        return go.Figure().add_annotation(text="No data", showarrow=False)
     
-    query = sentences[0]
-    candidates = sentences[1:]
+    labels = [f"{r['text']}" for r in top_results]
+    scores = [r['score'] for r in top_results]
+    colors = ['#6C63FF' if s >= 0.5 else '#FF6B6B' for s in scores]
     
-    col_q, col_c = st.columns([1, 2])
-    with col_q:
-        st.markdown("**🔵 Query:**")
-        st.markdown(f'<div class="query-box"><strong>{query}</strong></div>', unsafe_allow_html=True)
-    
-    with col_c:
-        st.markdown("**📌 Candidates:**")
-        for i, c in enumerate(candidates, 1):
-            st.markdown(f'<div class="candidate-item"><span class="num">{i}</span>{c}</div>', unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=labels[::-1],
+        x=scores[::-1],
+        orientation='h',
+        marker=dict(color=colors[::-1], cornerradius=4),
+        text=[f"{s:.4f}" for s in scores[::-1]],
+        textposition='outside',
+        hovertemplate='<b>%{y}</b><br>Score: %{x:.4f}<extra></extra>'
+    ))
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#C0C0D0'),
+        xaxis=dict(title='Cosine Similarity', range=[0, 1], gridcolor='rgba(255,255,255,0.07)'),
+        yaxis=dict(gridcolor='rgba(255,255,255,0.07)'),
+        height=400,
+        margin=dict(l=10, r=40, t=10, b=10),
+        showlegend=False,
+        transition=dict(duration=500),
+    )
+    return fig
 
-    # ── Embed ─────────────────────────────────────────────────
-    with st.spinner("🧠 Computing embeddings..."):
-        all_texts = [query] + candidates
-        embeddings = model.encode(all_texts)
+def heatmap_similarity(matrix, texts):
+    fig = go.Figure(data=go.Heatmap(
+        z=matrix,
+        x=[f"#{i+1}" for i in range(len(texts))],
+        y=[f"#{i+1}" for i in range(len(texts))],
+        text=[[f"{matrix[i][j]:.4f}" for j in range(len(texts))] for i in range(len(texts))],
+        texttemplate='%{text}',
+        textfont=dict(size=10, color='white'),
+        colorscale='Viridis',
+        zmin=0, zmax=1,
+        hoverongaps=False,
+    ))
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#C0C0D0'),
+        xaxis=dict(title='Text #', gridcolor='rgba(255,255,255,0.07)'),
+        yaxis=dict(title='Text #', gridcolor='rgba(255,255,255,0.07)'),
+        height=450,
+        margin=dict(l=10, r=10, t=10, b=10),
+    )
+    return fig
+
+def pca_scatter(embeddings, texts):
+    pca = PCA(n_components=2, random_state=42)
+    coords = pca.fit_transform(embeddings)
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=coords[:, 0],
+        y=coords[:, 1],
+        mode='markers+text',
+        marker=dict(
+            size=15,
+            color=[f'#{i:02x}{i:02x}{255-(i*20):02x}' for i in range(len(texts))],
+            line=dict(width=2, color='white'),
+        ),
+        text=[f"#{i+1}" for i in range(len(texts))],
+        textposition='top center',
+        hovertemplate='<b>%{text}</b><br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>',
+    ))
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#C0C0D0'),
+        xaxis=dict(title=f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)', gridcolor='rgba(255,255,255,0.07)'),
+        yaxis=dict(title=f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)', gridcolor='rgba(255,255,255,0.07)'),
+        height=500,
+        margin=dict(l=10, r=10, t=10, b=10),
+    )
+    return fig
+
+def radar_chart(scores):
+    if not scores:
+        return go.Figure().add_annotation(text="No data", showarrow=False)
+    
+    categories = list(scores.keys())
+    values = list(scores.values())
+    values += values[:1]
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=categories + [categories[0]],
+        fill='toself',
+        line=dict(color='#6C63FF', width=3),
+        fillcolor='rgba(108, 99, 255, 0.25)',
+        name='Paul\'s Scores',
+    ))
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100], gridcolor='rgba(255,255,255,0.07)'),
+            angularaxis=dict(gridcolor='rgba(255,255,255,0.07)'),
+        ),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#C0C0D0'),
+        height=400,
+        margin=dict(l=10, r=10, t=10, b=10),
+        showlegend=False,
+    )
+    return fig
+
+def gauge_chart(score):
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=score,
+        title=dict(text="Similarity Score", font=dict(color='#C0C0D0', size=16)),
+        gauge=dict(
+            axis=dict(range=[0, 1], tickcolor='#C0C0D0'),
+            bar=dict(color='#6C63FF'),
+            steps=[
+                dict(range=[0, 0.35], color='rgba(255,107,107,0.3)'),
+                dict(range=[0.35, 0.65], color='rgba(249,168,38,0.3)'),
+                dict(range=[0.65, 1], color='rgba(78,203,113,0.3)'),
+            ],
+            threshold=dict(
+                line=dict(color='#FF6B6B', width=4),
+                thickness=0.75,
+                value=0.5,
+            ),
+        ),
+        number=dict(font=dict(color='white', size=40)),
+    ))
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#C0C0D0'),
+        height=300,
+        margin=dict(l=10, r=10, t=10, b=10),
+    )
+    return fig
+
+def distribution_chart(scores):
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(
+        x=scores,
+        nbinsx=10,
+        marker=dict(color='#6C63FF', line=dict(width=1, color='white')),
+        hovertemplate='Score: %{x:.3f}<br>Count: %{y}<extra></extra>',
+    ))
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#C0C0D0'),
+        xaxis=dict(title='Similarity Score', gridcolor='rgba(255,255,255,0.07)'),
+        yaxis=dict(title='Count', gridcolor='rgba(255,255,255,0.07)'),
+        height=300,
+        margin=dict(l=10, r=10, t=10, b=10),
+        showlegend=False,
+    )
+    return fig
+
+# ──────────────────────────────────────────────────────────────
+#  UI Components
+# ──────────────────────────────────────────────────────────────
+def render_sidebar():
+    with st.sidebar:
+        st.markdown("""
+        <div style="text-align:center;padding:1rem 0 0.5rem 0;">
+            <div style="font-size:2rem;">🔮</div>
+            <div style="font-size:1.1rem;font-weight:600;color:#f0f0f8;">NLP Explorer</div>
+            <div style="font-size:0.7rem;color:#8e8ea0;">v2.0 · Sentence Transformers</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        query_embedding = embeddings[0:1]
-        candidate_embeddings = embeddings[1:]
-        similarities = cosine_similarity(query_embedding, candidate_embeddings)[0]
+        st.markdown("---")
         
-        sim_matrix = cosine_similarity(embeddings)
+        page = st.radio(
+            "Navigate",
+            ["Main", "Graphs", "Critical", "History", "About"],
+            index=0,
+            key="sidebar_nav",
+            label_visibility="collapsed",
+        )
         
-        results = []
-        for i, (cand, sim) in enumerate(zip(candidates, similarities)):
-            results.append({
-                "Rank": i + 1,
-                "Candidate": cand,
-                "Similarity Score": sim
-            })
-        results.sort(key=lambda x: x["Similarity Score"], reverse=True)
+        st.markdown("---")
+        
+        # Theme toggle
+        theme = st.toggle("🌙 Dark Mode", value=True, key="theme_toggle")
+        if theme != st.session_state.theme:
+            st.session_state.theme = "dark" if theme else "light"
+        
+        st.markdown("---")
+        st.caption("⚡ `all-MiniLM-L6-v2`")
+        st.caption("🔮 Free · No API · No training")
+    
+    return page
 
-    n = len(all_texts)
-    
-    # ── Metrics ─────────────────────────────────────────────────
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 📊 Summary")
-    
+def render_hero_header():
+    st.markdown("""
+    <div style="text-align:center;padding:1.5rem 0;">
+        <h1 style="font-size:2.8rem;font-weight:700;background:linear-gradient(135deg,#6C63FF,#A78BFA);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+            🔮 Semantic Similarity Explorer
+        </h1>
+        <p style="color:#a8a8c0;font-size:1.1rem;max-width:640px;margin:0 auto;">
+            Compare the semantic meaning of any text using free, pretrained
+            <strong>sentence-transformers</strong>.
+        </p>
+        <p style="color:#7a7a90;font-size:0.85rem;">
+            Model: <code>all-MiniLM-L6-v2</code> · 384‑dim · 512 tokens
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def animated_divider():
+    st.markdown('<hr style="border:0;border-top:1px solid rgba(255,255,255,0.07);margin:2rem 0;">', unsafe_allow_html=True)
+
+def render_metrics(primary_score, label, color, n_texts, elapsed_ms, dim):
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"""
-        <div class="metric-box">
-            <div class="value">{len(candidates)}</div>
-            <div class="label">Candidates</div>
+        <div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;text-align:center;">
+            <div style="font-size:2rem;font-weight:700;color:{color};">{primary_score:.4f}</div>
+            <div style="font-size:0.8rem;color:#8e8ea0;">Primary Similarity</div>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div class="metric-box">
-            <div class="value">{max(similarities):.3f}</div>
-            <div class="label">Highest Score</div>
+        <div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;text-align:center;">
+            <div style="font-size:2rem;font-weight:700;color:#f0f0f8;">{n_texts}</div>
+            <div style="font-size:0.8rem;color:#8e8ea0;">Texts Compared</div>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div class="metric-box">
-            <div class="value">{min(similarities):.3f}</div>
-            <div class="label">Lowest Score</div>
+        <div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;text-align:center;">
+            <div style="font-size:2rem;font-weight:700;color:#f0f0f8;">{elapsed_ms:.0f}ms</div>
+            <div style="font-size:0.8rem;color:#8e8ea0;">Inference Time</div>
         </div>
         """, unsafe_allow_html=True)
     with col4:
         st.markdown(f"""
-        <div class="metric-box">
-            <div class="value">{np.mean(similarities):.3f}</div>
-            <div class="label">Average Score</div>
+        <div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;text-align:center;">
+            <div style="font-size:2rem;font-weight:700;color:#f0f0f8;">{dim}</div>
+            <div style="font-size:0.8rem;color:#8e8ea0;">Embedding Dimension</div>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Top Results ────────────────────────────────────────────
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown(f"### 🏆 Top {len(results)} Results")
+def render_success_banner(primary_score, label):
+    st.markdown(f"""
+    <div style="background:rgba(108,99,255,0.10);border:1px solid rgba(108,99,255,0.2);border-radius:12px;padding:1rem;margin:1rem 0;">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <span style="font-size:2rem;">✅</span>
+            <span style="font-weight:600;color:#f0f0f8;">Analysis Complete</span>
+            <span style="color:#8e8ea0;">Primary similarity score:</span>
+            <span style="font-weight:700;color:#6C63FF;font-size:1.2rem;">{primary_score:.4f}</span>
+            <span style="font-size:0.9rem;color:#a8a8c0;">({label})</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_top_results(top_results):
+    if not top_results:
+        st.info("No results to display.")
+        return
     
-    for i, r in enumerate(results, 1):
-        score_pct = r["Similarity Score"] * 100
-        bar_width = min(score_pct, 100)
-        
-        if r["Similarity Score"] >= 0.7:
-            bar_color = "linear-gradient(90deg, #00b894, #00cec9)"
-        elif r["Similarity Score"] >= 0.4:
-            bar_color = "linear-gradient(90deg, #fdcb6e, #e17055)"
-        else:
-            bar_color = "linear-gradient(90deg, #fd79a8, #e17055)"
-        
+    for i, r in enumerate(top_results, 1):
+        label, color = similarity_label(r['score'])
         st.markdown(f"""
-        <div class="result-row">
-            <span class="rank">#{i}</span>
-            <span class="text">{r['Candidate']}</span>
-            <span class="score">{r['Similarity Score']:.4f}</span>
-        </div>
-        <div class="progress-container">
-            <div class="progress-bar-custom" style="width:{bar_width}%; background:{bar_color};"></div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.8rem 1rem;margin:0.5rem 0;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <span style="font-weight:600;color:#6C63FF;">#{i}</span>
+                <span style="color:#f0f0f8;margin-left:0.8rem;">{r['text']}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.8rem;">
+                <span style="color:#8e8ea0;font-size:0.9rem;">{label}</span>
+                <span style="font-weight:700;color:{color};">{r['score']:.4f}</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
+
+def render_embedding_preview(emb, label="Embedding"):
+    preview = format_vector(emb, 8)
+    st.markdown(f"""
+    <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.8rem 1rem;margin:0.3rem 0;font-family:monospace;font-size:0.85rem;color:#c8c8d8;">
+        <span style="color:#6C63FF;">{label}</span> → {preview}
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_critical_thinking_cards(scores):
+    if not scores:
+        st.info("Run an analysis first to see Paul's standards scores.")
+        return
     
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── GRAPH 1: Bar Chart ─────────────────────────────────────
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 📈 Graph 1 — Bar Chart: Top Similar Words/Sentences")
-    st.caption("Shows top similar words/sentences with their exact similarity scores.")
-
-    top_n = min(8, len(results))
-    labels = [f"#{r['Rank']} {r['Candidate'][:30]}..." if len(r['Candidate']) > 30 else f"#{r['Rank']} {r['Candidate']}" for r in results[:top_n]]
-    scores = [r['Similarity Score'] for r in results[:top_n]]
-    
-    colors = ["#00b894" if s >= 0.7 else "#fdcb6e" if s >= 0.4 else "#fd79a8" for s in scores]
-
-    fig1, ax1 = plt.subplots(figsize=(10, 5))
-    bars = ax1.barh(labels[::-1], scores[::-1], color=colors[::-1], edgecolor='white', height=0.6)
-    ax1.set_xlabel("Cosine Similarity Score", fontsize=11, color='#2d3436')
-    ax1.set_title("Top Similarity Scores", fontsize=14, fontweight='700', color='#2d3436')
-    ax1.set_xlim(0, 1)
-    ax1.set_facecolor('#f8f9fa')
-    ax1.grid(True, alpha=0.2, axis='x')
-    
-    for bar, score in zip(bars, scores[::-1]):
-        ax1.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height()/2,
-                 f"{score:.4f}", va='center', fontsize=9, fontweight='600')
-    ax1.axvline(0.5, color='#636e72', linestyle='--', linewidth=1, alpha=0.5, label='0.5 threshold')
-    ax1.legend(loc='lower right', fontsize=9)
-    plt.tight_layout()
-    st.pyplot(fig1)
-    plt.close()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── GRAPH 2: Heatmap ──────────────────────────────────────
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🌡️ Graph 2 — Heatmap: Pairwise Similarity Matrix")
-    st.caption("Shows pairwise similarity between selected words/sentences.")
-
-    short_labels = [s[:15] + "…" if len(s) > 15 else s for s in all_texts]
-
-    fig2, ax2 = plt.subplots(figsize=(9, 7))
-    sns.heatmap(
-        sim_matrix,
-        annot=True,
-        fmt=".2f",
-        cmap="coolwarm",
-        xticklabels=short_labels,
-        yticklabels=short_labels,
-        linewidths=0.5,
-        vmin=0, vmax=1,
-        ax=ax2,
-        cbar_kws={'shrink': 0.8}
-    )
-    ax2.set_title("Pairwise Cosine Similarity Heatmap", fontsize=14, fontweight='700')
-    plt.xticks(rotation=30, ha='right', fontsize=8)
-    plt.yticks(rotation=0, fontsize=8)
-    plt.tight_layout()
-    st.pyplot(fig2)
-    plt.close()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── Paul's Critical Thinking Standards with Scores ────────
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🧠 Paul's Critical Thinking Standards - Analysis Report")
-    st.caption("Automated scoring (0-100%) based on the analysis results")
-
-    # Calculate scores
-    paul_scores = calculate_paul_scores(sentences, results, query, similarities, sim_matrix, n)
-
-    # Display scores in a nice grid
     cols = st.columns(4)
-    standard_emojis = {
+    emojis = {
         "Clarity": "🔵",
         "Accuracy": "🟢",
         "Precision": "🟡",
@@ -615,115 +549,192 @@ if run_btn:
         "Significance": "🟣",
         "Fairness": "⚪"
     }
-
-    for idx, (standard, score) in enumerate(paul_scores.items()):
+    
+    for idx, (standard, score) in enumerate(scores.items()):
         col = cols[idx % 4]
         with col:
             if score >= 80:
                 status = "✅ Excellent"
-                color = "#00b894"
+                color = "#4ECB71"
             elif score >= 60:
                 status = "👍 Good"
-                color = "#fdcb6e"
+                color = "#F9A826"
             elif score >= 40:
-                status = "⚠️ Needs Improvement"
-                color = "#fd79a8"
+                status = "⚠️ Needs Work"
+                color = "#FF6B6B"
             else:
-                status = "❌ Needs Attention"
-                color = "#e17055"
+                status = "❌ Poor"
+                color = "#FF6B6B"
             
             st.markdown(f"""
-            <div style="background: white; padding: 1rem; border-radius: 12px; text-align: center; border: 1px solid #e9ecef; margin-bottom: 0.8rem;">
-                <div style="font-size: 1.5rem;">{standard_emojis.get(standard, '📌')}</div>
-                <div style="font-weight: 600; font-size: 0.8rem; color: #2d3436; margin-top: 0.2rem;">{standard}</div>
-                <div style="font-size: 2rem; font-weight: 700; color: {color};">{score}%</div>
-                <div style="font-size: 0.7rem; color: #6c757d; margin-top: 0.2rem;">{status}</div>
+            <div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;text-align:center;border:1px solid rgba(255,255,255,0.06);margin:0.3rem 0;">
+                <div style="font-size:1.5rem;">{emojis.get(standard, '📌')}</div>
+                <div style="font-weight:600;font-size:0.8rem;color:#f0f0f8;margin-top:0.2rem;">{standard}</div>
+                <div style="font-size:1.6rem;font-weight:700;color:{color};">{score}%</div>
+                <div style="font-size:0.7rem;color:#8e8ea0;">{status}</div>
             </div>
             """, unsafe_allow_html=True)
 
-    # ── Detailed Explanations ──────────────────────────────────
-    st.markdown("---")
-    st.markdown("#### 📋 Detailed Standard Analysis")
+def render_model_info(info):
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**Model:** `{info['name']}`")
+        st.markdown(f"**Dimension:** {info['dimension']}")
+        st.markdown(f"**Type:** {info['type']}")
+    with col2:
+        st.markdown(f"**Max Tokens:** {info['tokens']}")
+        st.markdown(f"**Language:** {info['language']}")
+        st.markdown(f"**License:** {info['license']}")
 
-    top = results[0] if results else None
-    bot = results[-1] if results else None
-    t1 = top['Candidate'][:50] if top else ""
-    t2 = query[:50]
-    b1 = bot['Candidate'][:50] if bot else ""
-    b2 = query[:50]
-    tscore = top['Similarity Score'] if top else 0
-    bscore = bot['Similarity Score'] if bot else 0
-
-    standards_details = {
-        "🔵 Clarity": (
-            f"**Score: {paul_scores['Clarity']}%**  \n"
-            f"The user entered **{n} sentences**. The **query** was: *'{query}'*.  \n"
-            f"{len(candidates)} candidate sentences were compared.  \n"
-            f"The model converted each sentence into a **384-dimensional vector**.  \n"
-            f"**Cosine similarity** (0=unrelated, 1=identical) was computed for every pair.  \n"
-            f"Results are displayed as **exact scores**, a **heatmap**, and a **bar chart**."
-        ),
-        "🟢 Accuracy": (
-            f"**Score: {paul_scores['Accuracy']}%**  \n"
-            f"Model used: **all-MiniLM-L6-v2** from sentence-transformers.  \n"
-            f"No preprocessing, training, or post-processing was applied.  \n"
-            f"Scores are **raw cosine similarities** between embeddings.  \n"
-            f"No claims beyond what the model produces are made."
-        ),
-        "🟡 Precision": (
-            f"**Score: {paul_scores['Precision']}%**  \n"
-            f"**Highest similarity:** **{tscore:.4f}** between *'{t1}'* and *'{t2}'*.  \n"
-            f"**Lowest similarity:** **{bscore:.4f}** between *'{b1}'* and *'{b2}'*.  \n"
-            f"All scores are shown with **4-decimal precision**.  \n"
-            f"No vague labels like 'high' or 'low' are used."
-        ),
-        "🟠 Relevance": (
-            f"**Score: {paul_scores['Relevance']}%**  \n"
-            f"**Graph 1 (Bar Chart):** Ranks pairs by similarity score.  \n"
-            f"**Graph 2 (Heatmap):** Shows complete pairwise similarity matrix.  \n"
-            f"Both graphs directly reflect the computed similarity values."
-        ),
-        "🔴 Logic": (
-            f"**Score: {paul_scores['Logic']}%**  \n"
-            f"The top pair scored **{tscore:.4f}** because both sentences share similar "
-            f"semantic meaning in the embedding space.  \n"
-            f"The heatmap confirms this relationship visually."
-        ),
-        "🟣 Significance": (
-            f"**Score: {paul_scores['Significance']}%**  \n"
-            f"The **most important finding** is the highest-scoring pair "
-            f"(score = **{tscore:.4f}**).  \n"
-            f"Scores above **0.70** indicate strong semantic similarity."
-        ),
-        "⚪ Fairness": (
-            f"**Score: {paul_scores['Fairness']}%**  \n"
-            f"**Limitation:** all-MiniLM-L6-v2 is optimised for **English** and may "
-            f"produce lower-quality embeddings for other languages, domain-specific "
-            f"jargon, or very short single-word inputs.  \n"
-            f"It reflects biases present in its training corpus."
-        ),
-    }
-
-    for standard, explanation in standards_details.items():
-        with st.expander(standard, expanded=False):
-            st.markdown(explanation)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── Final Info Box ────────────────────────────────────────
+def render_footer():
     st.markdown("""
-    <div class="info-box">
-        💡 <strong>How to interpret:</strong> Scores closer to <strong>1.0</strong> indicate stronger semantic similarity. 
-        The <strong>heatmap</strong> shows the complete similarity matrix, and the <strong>bar chart</strong> ranks the top pairs.
-        <br><br>
-        🧠 <strong>Paul's Standards Scores:</strong> Each standard is scored from 0-100% based on the quality and completeness of the analysis.
+    <hr style="border:0;border-top:1px solid rgba(255,255,255,0.07);margin:2rem 0;">
+    <div style="text-align:center;color:#6a6a80;font-size:0.8rem;padding:1rem 0;">
+        <span>🔮 NLP Semantic Similarity Explorer</span>
+        <span style="margin:0 0.8rem;">·</span>
+        <span>Model: <code>all-MiniLM-L6-v2</code></span>
+        <span style="margin:0 0.8rem;">·</span>
+        <span>Built for NLP Lab Quiz</span>
+        <br>
+        <span style="font-size:0.7rem;">Free · Pretrained · No training · No API</span>
     </div>
     """, unsafe_allow_html=True)
 
-# ── Footer ─────────────────────────────────────────────────────
-st.markdown("""
-<div class="footer">
-    Built for NLP Lab Quiz · Model: all-MiniLM-L6-v2 · 
-    No preprocessing · No training · Free pretrained model only
-</div>
-""", unsafe_allow_html=True)
+def render_performance_stats():
+    st.caption(f"🔮 Model: `{MODEL_NAME}` · {MODEL_DIM} dims")
+
+def render_score_bar(score, label):
+    pct = int(score * 100)
+    color = "#6C63FF" if score >= 0.5 else "#FF6B6B"
+    st.markdown(f"""
+    <div style="margin:0.3rem 0;">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:#c8c8d8;">{label}</span>
+            <span style="color:#f0f0f8;font-weight:600;">{score:.4f}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.06);border-radius:4px;height:6px;overflow:hidden;">
+            <div style="background:{color};height:100%;width:{pct}%;border-radius:4px;transition:width 0.5s;"></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def results_to_csv(texts, top_results, matrix):
+    import csv
+    from io import StringIO
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Type", "Text/Score"])
+    writer.writerow(["Query", texts[0]])
+    writer.writerow(["Top Results"])
+    for r in top_results:
+        writer.writerow([f"#{r['rank']}", f"{r['text']} ({r['score']:.4f})"])
+    writer.writerow([])
+    writer.writerow(["Pairwise Similarity Matrix"])
+    writer.writerow([""] + [f"T{i+1}" for i in range(len(texts))])
+    for i in range(len(texts)):
+        row = [f"T{i+1}"] + [f"{matrix[i][j]:.4f}" for j in range(len(texts))]
+        writer.writerow(row)
+    return output.getvalue().encode('utf-8')
+
+def history_to_csv():
+    df = get_history_df()
+    return df.to_csv(index=False).encode('utf-8')
+
+def clipboard_button(text, label):
+    b64 = base64.b64encode(text.encode()).decode()
+    st.markdown(f"""
+    <button onclick="navigator.clipboard.writeText(atob('{b64}'))" 
+            style="background:rgba(108,99,255,0.2);border:1px solid rgba(108,99,255,0.3);border-radius:8px;padding:0.3rem 1rem;color:#c8c8d8;cursor:pointer;">
+        {label}
+    </button>
+    """, unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────────────────────
+#  Main App
+# ──────────────────────────────────────────────────────────────
+def main():
+    inject_css()
+    init_session_state()
+    model = load_model()
+    
+    page = render_sidebar()
+    
+    if page == "Main":
+        render_hero_header()
+        animated_divider()
+        
+        st.markdown("## ✍️ Enter Your Texts")
+        st.caption("Enter 2 to 10 texts. The model computes cosine similarity between ALL pairs.")
+        
+        n_inputs = st.slider("Number of texts to compare", min_value=2, max_value=10, value=3)
+        
+        default_texts = [
+            "Artificial intelligence is transforming the world.",
+            "Machine learning enables computers to learn from data.",
+            "The cat sat on the mat reading a book.",
+            "Deep learning models are a subset of machine learning.",
+            "Neural networks are inspired by the human brain.",
+        ]
+        
+        texts = []
+        cols_per_row = 2
+        flat_cols = []
+        for row in range((n_inputs + 1) // cols_per_row):
+            cols = st.columns(cols_per_row)
+            flat_cols.extend(cols)
+        
+        for i in range(n_inputs):
+            with flat_cols[i]:
+                default = default_texts[i] if i < len(default_texts) else ""
+                txt = st.text_area(
+                    f"Text {i+1}",
+                    value=default,
+                    height=110,
+                    placeholder=f"Enter word, sentence, or paragraph #{i+1}…",
+                    key=f"text_input_{i}",
+                )
+                texts.append(txt)
+        
+        animated_divider()
+        
+        ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([2, 1, 1])
+        with ctrl_col1:
+            top_k = st.slider("Top-K similar results to show", 2, min(9, n_inputs - 1) if n_inputs > 2 else 1, min(5, n_inputs - 1))
+        with ctrl_col2:
+            run_btn = st.button("🚀 Analyse Similarity", use_container_width=True)
+        with ctrl_col3:
+            reset_btn = st.button("🔄 Reset", use_container_width=True)
+            if reset_btn:
+                for i in range(n_inputs):
+                    if f"text_input_{i}" in st.session_state:
+                        del st.session_state[f"text_input_{i}"]
+                st.rerun()
+        
+        if run_btn:
+            clean_texts = [t.strip() for t in texts if t.strip()]
+            if len(clean_texts) < 2:
+                st.warning("⚠️ Please enter at least 2 non-empty texts.")
+                st.stop()
+            
+            with st.spinner("🔮 Generating embeddings..."):
+                start_time = time.time()
+                embeddings = model.encode(clean_texts)
+                elapsed_ms = (time.time() - start_time) * 1000
+            
+            primary_score = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+            label, color = similarity_label(primary_score)
+            matrix = cosine_similarity(embeddings)
+            
+            all_scores = []
+            for i in range(len(clean_texts)):
+                for j in range(i + 1, len(clean_texts)):
+                    all_scores.append(float(matrix[i, j]))
+            
+            top_results = []
+            for i in range(1, len(clean_texts)):
+                score = float(matrix[0, i])
+                top_results.append({"rank": i, "text": clean_texts[i], "score": score})
+            top_results.sort(key=lambda x: x['score'], reverse=True)
+            top_results = top_results[:top_k]
+            
+            paul_scores = compute_paul
