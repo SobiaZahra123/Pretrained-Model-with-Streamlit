@@ -7,7 +7,7 @@ to compute and visualise text/sentence similarity — built for the NLP Lab Quiz
 
 ## 🚀 Live App
 
-👉 **(https://pretrained-model-with-app-7nyfthdp8mlul5bsxkunmb.streamlit.app/)**  
+👉 **Click here (https://pretrained-model-with-app-7nyfthdp8mlul5bsxkunmb.streamlit.app/)**  
 ---
 
 ## 🤖 Model Used
