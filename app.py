@@ -1,9 +1,3 @@
-# ================================================================
-#  NLP Quiz – Text/Word Similarity App
-#  Model  : all-MiniLM-L6-v2  (free, no training, no preprocessing)
-#  Deploy : Streamlit Community Cloud
-# ================================================================
-
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,14 +10,12 @@ from sentence_transformers import SentenceTransformer
 import pandas as pd
 import time
 
-# ── Page config ──────────────────────────────────────────────
 st.set_page_config(
     page_title="NLP Similarity Explorer",
     page_icon="🔍",
     layout="wide"
 )
 
-# ── Custom CSS with Interactive Colors ──────────────────────
 st.markdown("""
 <style>
     /* Main gradient background */
@@ -263,7 +255,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Load model ────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     return SentenceTransformer("all-MiniLM-L6-v2")
@@ -273,7 +264,6 @@ with st.spinner("🔄 Loading pretrained model (all-MiniLM-L6-v2)…"):
 
 st.success("✅ Model loaded: all-MiniLM-L6-v2")
 
-# ── Helper Functions ──────────────────────────────────────────
 def similarity_label(score):
     if score >= 0.75:
         return "🔵 Very Similar", "#6C63FF"
@@ -328,10 +318,8 @@ def compute_paul_scores(primary_score, all_scores, n_texts):
     
     return scores
 
-# ── PAUL'S STANDARDS GRAPHS ──────────────────────────────────
 
 def graph_paul_bar_chart(paul_scores):
-    """Bar Chart for Paul's Critical Thinking Standards"""
     categories = list(paul_scores.keys())
     values = list(paul_scores.values())
     
@@ -363,11 +351,9 @@ def graph_paul_bar_chart(paul_scores):
     return fig
 
 def graph_paul_heatmap(paul_scores):
-    """Heatmap for Paul's Critical Thinking Standards"""
     categories = list(paul_scores.keys())
     values = list(paul_scores.values())
     
-    # Create a matrix format for heatmap
     data = np.array(values).reshape(1, -1)
     
     fig, ax = plt.subplots(figsize=(10, 3))
@@ -379,7 +365,6 @@ def graph_paul_heatmap(paul_scores):
     ax.set_yticklabels(['Score'], fontsize=9)
     ax.set_title("Paul's Critical Thinking Standards Heatmap", fontsize=14, fontweight='700', color='#2d3436')
     
-    # Add text annotations
     for i, v in enumerate(values):
         ax.text(i, 0, f"{v}%", ha='center', va='center', fontsize=12, fontweight='bold', color='white')
     
@@ -388,14 +373,13 @@ def graph_paul_heatmap(paul_scores):
     return fig
 
 def graph_paul_radar(paul_scores):
-    """Radar chart for Paul's Critical Thinking Standards"""
     categories = list(paul_scores.keys())
     values = list(paul_scores.values())
     values += values[:1]
     angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False).tolist()
     angles += angles[:1]
     
-    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(projection='polar'))
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(projection='polar'))
     ax.plot(angles, values, 'o-', linewidth=2, color='#667eea')
     ax.fill(angles, values, alpha=0.25, color='#667eea')
     ax.set_xticks(angles[:-1])
@@ -413,7 +397,6 @@ def graph_paul_radar(paul_scores):
     plt.tight_layout()
     return fig
 
-# ── Sidebar ────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ✍️ Input")
     st.markdown("Enter one sentence/word per line (min 2, max 10).")
@@ -444,7 +427,6 @@ with st.sidebar:
     *Free & Pretrained*
     """)
 
-# ── Main logic ────────────────────────────────────────────────
 if run_btn:
 
     sentences = [line.strip() for line in raw_input.strip().split("\n") if line.strip()]
@@ -475,7 +457,6 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Embed ─────────────────────────────────────────────────
     with st.spinner("🧠 Computing embeddings..."):
         all_texts = [query] + candidates
         embeddings = model.encode(all_texts)
@@ -497,7 +478,6 @@ if run_btn:
 
     n = len(all_texts)
     
-    # ── Metrics ─────────────────────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 📊 Summary")
     
@@ -533,7 +513,6 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Top Results ────────────────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown(f"### 🏆 Top {len(results)} Results")
     
@@ -561,15 +540,12 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Compute Paul's Scores ──────────────────────────────────
     paul_scores = compute_paul_scores(similarities[0], similarities, n)
 
-    # ── PAUL'S STANDARDS SECTION ──────────────────────────────
     st.markdown("---")
     st.markdown("## 🧠 Paul's Critical Thinking Standards Analysis")
     st.markdown("*(Automated scoring based on the analysis results)*")
 
-    # ── PAUL'S STANDARDS CARDS ─────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 📊 Standards Scores")
     
@@ -605,7 +581,6 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── GRAPH 1: Paul's Bar Chart ──────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 📊 Graph 1 — Paul's Standards Bar Chart")
     st.caption("Shows the scores for each of Paul's Critical Thinking Standards.")
@@ -615,7 +590,6 @@ if run_btn:
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── GRAPH 2: Paul's Heatmap ─────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 🌡️ Graph 2 — Paul's Standards Heatmap")
     st.caption("Visualizes the scores for each standard in a heatmap format.")
@@ -625,7 +599,6 @@ if run_btn:
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── GRAPH 3: Paul's Radar Chart ─────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 🗺️ Graph 3 — Paul's Standards Radar Chart")
     st.caption("Shows the overall profile of critical thinking standards.")
@@ -635,7 +608,6 @@ if run_btn:
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Detailed Explanations ───────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 📋 Detailed Standard Analysis")
 
@@ -704,7 +676,6 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Model Info ──────────────────────────────────────────────
     st.markdown("---")
     st.markdown("### ℹ️ Model Information")
     col1, col2 = st.columns(2)
@@ -718,7 +689,6 @@ if run_btn:
         st.markdown(f"**Max Tokens:** 512")
 
 else:
-    # ── Placeholder ──────────────────────────────────────────────
     st.info("👆 Enter your texts above and click **Compute Similarity** to see results.")
 
     st.markdown("### 📊 What You'll See")
@@ -748,7 +718,6 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-# ── Footer ─────────────────────────────────────────────────────
 st.markdown("""
 <div class="footer">
     Built for NLP Lab Quiz · Model: all-MiniLM-L6-v2 · 
