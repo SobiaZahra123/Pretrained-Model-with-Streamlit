@@ -106,7 +106,7 @@ if run_btn:
     # ── GRAPH 1: Bar Chart ────────────────────────────────────
     st.subheader("📈 Graph 1 — Bar Chart: Top Similar Pairs")
 
-    top_n  = min(8, len(pairs))
+    top_n = min(8, len(pairs))
     labels = [
         f"{p[0][:20]}…\n↔ {p[1][:20]}…" if len(p[0]) > 20 or len(p[1]) > 20
         else f"{p[0]}\n↔ {p[1]}"
@@ -154,7 +154,7 @@ if run_btn:
     # ── GRAPH 3: 2D PCA ───────────────────────────────────────
     st.subheader("🗺️ Graph 3 — 2D PCA Embedding Plot")
 
-    pca2   = PCA(n_components=2, random_state=42)
+    pca2 = PCA(n_components=2, random_state=42)
     coords2 = pca2.fit_transform(embeddings)
 
     fig3, ax3 = plt.subplots(figsize=(9, 6))
@@ -184,12 +184,12 @@ if run_btn:
 
     # slider to rotate 3D view
     col_el, col_az = st.columns(2)
-    elev = col_el.slider("Elevation angle", min_value=0,  max_value=90,  value=25, step=5)
-    azim = col_az.slider("Azimuth angle",   min_value=0,  max_value=360, value=45, step=5)
+    elev = col_el.slider("Elevation angle", min_value=0, max_value=90, value=25, step=5)
+    azim = col_az.slider("Azimuth angle", min_value=0, max_value=360, value=45, step=5)
 
     # need at least 3 components; cap at n
     n_comp = min(3, n)
-    pca3   = PCA(n_components=n_comp, random_state=42)
+    pca3 = PCA(n_components=n_comp, random_state=42)
     coords3_raw = pca3.fit_transform(embeddings)
 
     # pad to 3 columns if fewer sentences than 3
@@ -201,15 +201,21 @@ if run_btn:
         coords3 = coords3_raw
         ev = pca3.explained_variance_ratio_
 
-cmap = plt.colormaps.get_cmap('tab10')
+    # ============================================
+    # FIXED: Proper colormap handling
+    # ============================================
+    try:
+        cmap = plt.get_cmap('tab10')
+    except AttributeError:
+        cmap = plt.cm.get_cmap('tab10')
+    
+    colors3 = [cmap(i % 10) for i in range(n)]
 
-cmap = plt.get_cmap('tab10')  
-colors3 = [cmap(i) for i in range(n)]
+    fig4 = plt.figure(figsize=(10, 7))
+    ax4 = fig4.add_subplot(111, projection='3d')
 
-fig4 = plt.figure(figsize=(10, 7))
-ax4  = fig4.add_subplot(111, projection='3d')
-for i in range(n):
-    ax4.scatter(
+    for i in range(n):
+        ax4.scatter(
             coords3[i, 0], coords3[i, 1], coords3[i, 2],
             color=colors3[i], s=120, edgecolors='white', linewidths=1, zorder=3
         )
@@ -223,11 +229,11 @@ for i in range(n):
     for i in range(n):
         for j in range(i+1, n):
             sim = sim_matrix[i][j]
-            if sim >= 0.4:          # only draw meaningful connections
+            if sim >= 0.4:
                 ax4.plot(
-                    [coords3[i,0], coords3[j,0]],
-                    [coords3[i,1], coords3[j,1]],
-                    [coords3[i,2], coords3[j,2]],
+                    [coords3[i, 0], coords3[j, 0]],
+                    [coords3[i, 1], coords3[j, 1]],
+                    [coords3[i, 2], coords3[j, 2]],
                     color='gray', alpha=sim * 0.6, linewidth=sim * 2
                 )
 
@@ -258,8 +264,8 @@ for i in range(n):
     # ── Paul's Critical Thinking Standards ───────────────────
     st.subheader("🧠 Critical Thinking Analysis (Paul's Standards)")
 
-    top    = pairs[0]
-    bot    = pairs[-1]
+    top = pairs[0]
+    bot = pairs[-1]
     t1, t2, tscore = top[0][:50], top[1][:50], top[2]
     b1, b2, bscore = bot[0][:50], bot[1][:50], bot[2]
 
@@ -314,6 +320,3 @@ for i in range(n):
         "App built for NLP Lab Quiz · Model: all-MiniLM-L6-v2 · "
         "No preprocessing · No training · Free pretrained model only"
     )
-
-
-
