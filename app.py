@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
 import seaborn as sns
-from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 import pandas as pd
@@ -253,7 +252,7 @@ st.markdown("""
         <span class="tag">✨ No Preprocessing</span>
         <span class="tag">🎯 No Training</span>
         <span class="tag">🚀 No Paid API</span>
-        <span class="tag">📊 3 Visualizations</span>
+        <span class="tag">📊 2 Visualizations</span>
         <span class="tag">🧠 Paul's Standards</span>
     </div>
 </div>
@@ -353,7 +352,6 @@ def calculate_paul_scores(sentences, results, query, similarities, sim_matrix, n
     elif len(results) >= 2:
         precision_score += 10
     
-    # Check if scores are clearly separated
     if len(results) >= 2:
         diff = results[0]['Similarity Score'] - results[-1]['Similarity Score']
         if diff > 0.4:
@@ -366,13 +364,13 @@ def calculate_paul_scores(sentences, results, query, similarities, sim_matrix, n
     # 4. Relevance Score
     relevance_score = 0
     if len(results) >= 2:
-        relevance_score += 25
+        relevance_score += 30
     if top_score > 0:
         relevance_score += 25
     if sim_matrix.shape[0] > 1:
         relevance_score += 25
     if n >= 2:
-        relevance_score += 25
+        relevance_score += 20
     scores['Relevance'] = min(relevance_score, 100)
     
     # 5. Logic Score
@@ -383,7 +381,6 @@ def calculate_paul_scores(sentences, results, query, similarities, sim_matrix, n
         logic_score += 15
     
     if len(results) >= 3:
-        # Check if similar concepts cluster together
         logic_score += 20
     elif len(results) >= 2:
         logic_score += 10
@@ -391,7 +388,6 @@ def calculate_paul_scores(sentences, results, query, similarities, sim_matrix, n
     if top_score > 0 and bot_score < top_score:
         logic_score += 25
     
-    # Check semantic coherence in top results
     if len(results) >= 2 and top_score > 0.4:
         logic_score += 25
     
@@ -600,36 +596,6 @@ if run_btn:
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── GRAPH 3: 2D PCA ──────────────────────────────────────
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🗺️ Graph 3 — 2D Embedding Plot (PCA)")
-    st.caption("Use PCA to show related terms near each other.")
-
-    pca2 = PCA(n_components=2, random_state=42)
-    coords2 = pca2.fit_transform(embeddings)
-
-    fig3, ax3 = plt.subplots(figsize=(9, 6))
-    
-    colors_pca = ['#6c5ce7' if i == 0 else '#00b894' if i == 1 else '#fdcb6e' if i == 2 else '#fd79a8' if i == 3 else '#0984e3' for i in range(len(all_texts))]
-    sizes = [150 if i == 0 else 100 for i in range(len(all_texts))]
-
-    scatter = ax3.scatter(coords2[:, 0], coords2[:, 1], c=colors_pca, s=sizes, edgecolors='white', linewidths=2, zorder=3)
-    
-    for i, label in enumerate(short_labels):
-        prefix = "🔵 Query: " if i == 0 else f"{i}. "
-        ax3.annotate(f"{prefix}{label}", (coords2[i, 0], coords2[i, 1]),
-                    textcoords="offset points", xytext=(8, 5), fontsize=8, fontweight='600' if i == 0 else 'normal')
-    
-    ax3.set_title("2D PCA Projection of Sentence Embeddings", fontsize=14, fontweight='700')
-    ax3.set_xlabel(f"PC1 ({pca2.explained_variance_ratio_[0]*100:.1f}%)", fontsize=10)
-    ax3.set_ylabel(f"PC2 ({pca2.explained_variance_ratio_[1]*100:.1f}%)", fontsize=10)
-    ax3.set_facecolor('#f8f9fa')
-    ax3.grid(True, alpha=0.2)
-    plt.tight_layout()
-    st.pyplot(fig3)
-    plt.close()
-    st.markdown('</div>', unsafe_allow_html=True)
-
     # ── Paul's Critical Thinking Standards with Scores ────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 🧠 Paul's Critical Thinking Standards - Analysis Report")
@@ -695,7 +661,7 @@ if run_btn:
             f"{len(candidates)} candidate sentences were compared.  \n"
             f"The model converted each sentence into a **384-dimensional vector**.  \n"
             f"**Cosine similarity** (0=unrelated, 1=identical) was computed for every pair.  \n"
-            f"Results are displayed as **exact scores**, a **heatmap**, and a **2D PCA plot**."
+            f"Results are displayed as **exact scores**, a **heatmap**, and a **bar chart**."
         ),
         "🟢 Accuracy": (
             f"**Score: {paul_scores['Accuracy']}%**  \n"
@@ -715,31 +681,26 @@ if run_btn:
             f"**Score: {paul_scores['Relevance']}%**  \n"
             f"**Graph 1 (Bar Chart):** Ranks pairs by similarity score.  \n"
             f"**Graph 2 (Heatmap):** Shows complete pairwise similarity matrix.  \n"
-            f"**Graph 3 (2D PCA):** Shows geometric closeness of embeddings.  \n"
-            f"All three graphs directly reflect the computed similarity values."
+            f"Both graphs directly reflect the computed similarity values."
         ),
         "🔴 Logic": (
             f"**Score: {paul_scores['Logic']}%**  \n"
             f"The top pair scored **{tscore:.4f}** because both sentences share similar "
             f"semantic meaning in the embedding space.  \n"
-            f"Sentences with overlapping concepts cluster together in the PCA plot, "
-            f"confirming the scores.  \n"
-            f"The heatmap also shows this pair as the most similar (lighter color)."
+            f"The heatmap confirms this relationship visually."
         ),
         "🟣 Significance": (
             f"**Score: {paul_scores['Significance']}%**  \n"
             f"The **most important finding** is the highest-scoring pair "
             f"(score = **{tscore:.4f}**).  \n"
-            f"Scores above **0.70** indicate strong semantic similarity.  \n"
-            f"This suggests the two sentences convey closely related ideas."
+            f"Scores above **0.70** indicate strong semantic similarity."
         ),
         "⚪ Fairness": (
             f"**Score: {paul_scores['Fairness']}%**  \n"
             f"**Limitation:** all-MiniLM-L6-v2 is optimised for **English** and may "
             f"produce lower-quality embeddings for other languages, domain-specific "
             f"jargon, or very short single-word inputs.  \n"
-            f"It reflects biases present in its training corpus.  \n"
-            f"PCA also loses information from the original 384 dimensions."
+            f"It reflects biases present in its training corpus."
         ),
     }
 
@@ -753,8 +714,7 @@ if run_btn:
     st.markdown("""
     <div class="info-box">
         💡 <strong>How to interpret:</strong> Scores closer to <strong>1.0</strong> indicate stronger semantic similarity. 
-        The <strong>PCA plot</strong> shows how sentences are positioned in 2D space based on their meaning.
-        <strong>Closer points</strong> = more similar meanings.
+        The <strong>heatmap</strong> shows the complete similarity matrix, and the <strong>bar chart</strong> ranks the top pairs.
         <br><br>
         🧠 <strong>Paul's Standards Scores:</strong> Each standard is scored from 0-100% based on the quality and completeness of the analysis.
     </div>
