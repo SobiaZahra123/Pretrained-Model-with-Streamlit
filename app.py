@@ -1,16 +1,3 @@
-"""
-app.py
-======
-NLP Semantic Similarity Explorer — Main Streamlit Application
-
-Entry point for the entire app. Run with:
-    streamlit run app.py
-
-Requirements: see requirements.txt
-Model used  : sentence-transformers/all-MiniLM-L6-v2 (free, Apache 2.0)
-No preprocessing · No tokenization · No model training
-"""
-
 import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -27,9 +14,6 @@ import plotly.express as px
 from io import BytesIO
 import base64
 
-# ──────────────────────────────────────────────────────────────
-#  Page Configuration
-# ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="NLP Similarity Explorer",
     page_icon="🔮",
@@ -37,9 +21,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ──────────────────────────────────────────────────────────────
-#  Constants
-# ──────────────────────────────────────────────────────────────
 MODEL_NAME = "all-MiniLM-L6-v2"
 MODEL_DIM = 384
 MODEL_INFO = {
