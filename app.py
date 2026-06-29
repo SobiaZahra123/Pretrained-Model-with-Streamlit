@@ -208,9 +208,8 @@ colors3 = [cmap(i) for i in range(n)]
 
 fig4 = plt.figure(figsize=(10, 7))
 ax4  = fig4.add_subplot(111, projection='3d')
-
-    for i in range(n):
-        ax4.scatter(
+for i in range(n):
+    ax4.scatter(
             coords3[i, 0], coords3[i, 1], coords3[i, 2],
             color=colors3[i], s=120, edgecolors='white', linewidths=1, zorder=3
         )
