@@ -9,7 +9,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
-from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
@@ -258,7 +257,6 @@ st.markdown("""
         <span class="tag">🎯 No Training</span>
         <span class="tag">🚀 No Paid API</span>
         <span class="tag">📊 Interactive Visuals</span>
-        <span class="tag">🧊 3D Visualization</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -424,7 +422,8 @@ if run_btn:
 
     # ── GRAPH 1: Bar Chart ─────────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 📈 Similarity Scores")
+    st.markdown("### 📈 Graph 1 — Bar Chart: Top Similar Words/Sentences")
+    st.caption("Shows top similar words/sentences with their exact similarity scores.")
 
     top_n = min(8, len(results))
     labels = [f"#{r['Rank']} {r['Candidate'][:30]}..." if len(r['Candidate']) > 30 else f"#{r['Rank']} {r['Candidate']}" for r in results[:top_n]]
@@ -453,7 +452,8 @@ if run_btn:
 
     # ── GRAPH 2: Heatmap ──────────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🌡️ Similarity Matrix (Heatmap)")
+    st.markdown("### 🌡️ Graph 2 — Heatmap: Pairwise Similarity Matrix")
+    st.caption("Shows pairwise similarity between selected words/sentences.")
 
     short_labels = [s[:15] + "…" if len(s) > 15 else s for s in all_texts]
 
@@ -480,7 +480,8 @@ if run_btn:
 
     # ── GRAPH 3: 2D PCA ──────────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🗺️ 2D PCA Projection")
+    st.markdown("### 🗺️ Graph 3 — 2D Embedding Plot (PCA)")
+    st.caption("PCA projection showing related terms near each other.")
 
     pca2 = PCA(n_components=2, random_state=42)
     coords2 = pca2.fit_transform(embeddings)
@@ -508,92 +509,10 @@ if run_btn:
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── GRAPH 4: 3D PCA ────────────────────────────────────── (ADDED)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🧊 3D PCA Projection")
-    st.caption("🔄 Rotate the view using the sliders below")
-
-    col_el, col_az = st.columns(2)
-    elev = col_el.slider("Elevation angle", min_value=0, max_value=90, value=25, step=5, key="elev")
-    azim = col_az.slider("Azimuth angle", min_value=0, max_value=360, value=45, step=5, key="azim")
-
-    # Need at least 3 components; cap at n
-    n_comp = min(3, n)
-    pca3 = PCA(n_components=n_comp, random_state=42)
-    coords3_raw = pca3.fit_transform(embeddings)
-
-    # Pad to 3 columns if fewer sentences than 3
-    if coords3_raw.shape[1] < 3:
-        pad = np.zeros((coords3_raw.shape[0], 3 - coords3_raw.shape[1]))
-        coords3 = np.hstack([coords3_raw, pad])
-        ev = list(pca3.explained_variance_ratio_) + [0.0] * (3 - len(pca3.explained_variance_ratio_))
-    else:
-        coords3 = coords3_raw
-        ev = pca3.explained_variance_ratio_
-
-    try:
-        cmap = plt.get_cmap('tab10')
-    except AttributeError:
-        cmap = plt.cm.get_cmap('tab10')
-
-    colors3 = [cmap(i % 10) for i in range(n)]
-    colors3[0] = (0.4, 0.36, 0.91)  # #6c5ce7 for query
-
-    fig4 = plt.figure(figsize=(10, 7))
-    ax4 = fig4.add_subplot(111, projection='3d')
-
-    for i in range(n):
-        ax4.scatter(
-            coords3[i, 0], coords3[i, 1], coords3[i, 2],
-            color=colors3[i], s=120 if i == 0 else 100,
-            edgecolors='white', linewidths=1.5, zorder=3
-        )
-        ax4.text(
-            coords3[i, 0], coords3[i, 1], coords3[i, 2],
-            f" {i+1}. {short_labels[i]}",
-            fontsize=8, color='black', fontweight='bold' if i == 0 else 'normal'
-        )
-
-    # Draw lines between points scaled by similarity
-    for i in range(n):
-        for j in range(i+1, n):
-            sim = sim_matrix[i][j]
-            if sim >= 0.4:
-                ax4.plot(
-                    [coords3[i, 0], coords3[j, 0]],
-                    [coords3[i, 1], coords3[j, 1]],
-                    [coords3[i, 2], coords3[j, 2]],
-                    color='gray', alpha=sim * 0.6, linewidth=sim * 2
-                )
-
-    ax4.set_title("3D PCA Projection of Sentence Embeddings", fontsize=14, fontweight='700', pad=15)
-    ax4.set_xlabel(f"PC1 ({ev[0]*100:.1f}%)", fontsize=9)
-    ax4.set_ylabel(f"PC2 ({ev[1]*100:.1f}%)", fontsize=9)
-    ax4.set_zlabel(f"PC3 ({ev[2]*100:.1f}%)", fontsize=9)
-    ax4.view_init(elev=elev, azim=azim)
-    ax4.grid(True, alpha=0.2)
-
-    import matplotlib.patches as mpatches
-    patches = [mpatches.Patch(color=colors3[i], label=f"{i+1}. {short_labels[i]}") for i in range(n)]
-    ax4.legend(handles=patches, loc='upper left', fontsize=7, bbox_to_anchor=(1.05, 1))
-
-    plt.tight_layout()
-    st.pyplot(fig4)
-    plt.close()
-
-    st.markdown("""
-    <div class="info-box">
-        💡 <strong>How to read the 3D plot:</strong> Points close together in 3D space have similar semantic meaning. 
-        Gray lines connect pairs with similarity ≥ 0.40 — thicker and darker lines = higher similarity. 
-        Adjust the sliders to rotate the view.
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
     # ── Paul's Critical Thinking Standards ───────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🧠 Critical Thinking Analysis")
-    st.markdown("*(Paul's Critical Thinking Standards)*")
+    st.markdown("### 🧠 Paul's Critical Thinking Standards Analysis")
+    st.markdown("*(Applied to the analysis results)*")
 
     top = results[0]
     bot = results[-1]
@@ -606,42 +525,48 @@ if run_btn:
 
     standards = {
         "🔵 Clarity": (
-            f"The user entered {n} sentences. The model converted each into a "
-            f"384-dimensional vector. Cosine similarity (0=unrelated, 1=identical) "
-            f"was computed for every pair and displayed as scores, a heatmap, a 2D PCA plot, and a 3D PCA plot."
+            f"The user entered **{n} sentences**. The **query** was: *'{query}'*.  \n"
+            f"{len(candidates)} candidate sentences were compared.  \n"
+            f"The model converted each sentence into a **384-dimensional vector**.  \n"
+            f"**Cosine similarity** (0=unrelated, 1=identical) was computed for every pair.  \n"
+            f"Results are displayed as **exact scores**, a **heatmap**, and a **2D PCA plot**."
         ),
         "🟢 Accuracy": (
-            f"Model used: **all-MiniLM-L6-v2** (sentence-transformers). "
-            f"No claims beyond what the model produces are made. "
-            f"Scores are raw cosine similarities — no post-processing applied."
+            f"Model used: **all-MiniLM-L6-v2** from sentence-transformers.  \n"
+            f"No preprocessing, training, or post-processing was applied.  \n"
+            f"Scores are **raw cosine similarities** between embeddings.  \n"
+            f"No claims beyond what the model produces are made."
         ),
         "🟡 Precision": (
-            f"Highest similarity: **{tscore:.4f}** between *'{t1}'* and *'{t2}'*. "
-            f"Lowest similarity: **{bscore:.4f}** between *'{b1}'* and *'{b2}'*. "
-            f"Exact 4-decimal scores are shown throughout, not vague labels."
+            f"**Highest similarity:** **{tscore:.4f}** between *'{t1}'* and *'{t2}'*.  \n"
+            f"**Lowest similarity:** **{bscore:.4f}** between *'{b1}'* and *'{b2}'*.  \n"
+            f"All scores are shown with **4-decimal precision**.  \n"
+            f"No vague labels like 'high' or 'low' are used."
         ),
         "🟠 Relevance": (
-            f"All four graphs directly reflect the computed similarity values. "
-            f"The bar chart ranks pairs, the heatmap shows the full matrix, "
-            f"the 2D PCA shows geometric closeness, and the 3D PCA adds a third "
-            f"dimension for deeper spatial understanding of relationships."
+            f"**Graph 1 (Bar Chart):** Ranks pairs by similarity score.  \n"
+            f"**Graph 2 (Heatmap):** Shows complete pairwise similarity matrix.  \n"
+            f"**Graph 3 (2D PCA):** Shows geometric closeness of embeddings.  \n"
+            f"All three graphs directly reflect the computed similarity values."
         ),
         "🔴 Logic": (
-            f"The top pair scored {tscore:.4f} because both sentences share similar "
-            f"semantic meaning in the embedding space. Sentences with overlapping "
-            f"concepts cluster together in both PCA plots, confirming the scores. "
-            f"The 3D plot lines visually confirm which pairs are most related."
+            f"The top pair scored **{tscore:.4f}** because both sentences share similar "
+            f"semantic meaning in the embedding space.  \n"
+            f"Sentences with overlapping concepts cluster together in the PCA plot, "
+            f"confirming the scores.  \n"
+            f"The heatmap also shows this pair as the most similar."
         ),
         "🟣 Significance": (
-            f"The most important finding is the highest-scoring pair "
-            f"(score = {tscore:.4f}). Scores above 0.70 indicate strong semantic "
-            f"similarity. The 3D plot makes clusters easier to spot than 2D alone."
+            f"The **most important finding** is the highest-scoring pair "
+            f"(score = **{tscore:.4f}**).  \n"
+            f"Scores above **0.70** indicate strong semantic similarity.  \n"
+            f"This suggests the two sentences convey closely related ideas."
         ),
         "⚪ Fairness": (
-            f"**Limitation:** all-MiniLM-L6-v2 is optimised for English and may "
+            f"**Limitation:** all-MiniLM-L6-v2 is optimised for **English** and may "
             f"produce lower-quality embeddings for other languages, domain-specific "
-            f"jargon, or very short single-word inputs. It reflects biases present "
-            f"in its training corpus."
+            f"jargon, or very short single-word inputs.  \n"
+            f"It reflects biases present in its training corpus."
         ),
     }
 
@@ -654,9 +579,9 @@ if run_btn:
     # ── Info Box ──────────────────────────────────────────────
     st.markdown("""
     <div class="info-box">
-        💡 <strong>How to interpret:</strong> Scores closer to 1.0 indicate stronger semantic similarity. 
-        The <strong>PCA plots</strong> (2D and 3D) show how sentences are positioned in space based on their meaning.
-        Closer points = more similar meanings. The <strong>3D view</strong> provides additional depth for understanding relationships.
+        💡 <strong>How to interpret:</strong> Scores closer to <strong>1.0</strong> indicate stronger semantic similarity. 
+        The <strong>PCA plot</strong> shows how sentences are positioned in 2D space based on their meaning.
+        <strong>Closer points</strong> = more similar meanings.
     </div>
     """, unsafe_allow_html=True)
 
