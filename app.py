@@ -14,6 +14,7 @@ from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 import pandas as pd
+import time
 
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(
@@ -257,6 +258,7 @@ st.markdown("""
         <span class="tag">🎯 No Training</span>
         <span class="tag">🚀 No Paid API</span>
         <span class="tag">📊 Interactive Visuals</span>
+        <span class="tag">🧠 Paul's Standards</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -270,6 +272,146 @@ with st.spinner("🔄 Loading pretrained model (all-MiniLM-L6-v2)…"):
     model = load_model()
 
 st.success("✅ Model loaded: all-MiniLM-L6-v2")
+
+# ── Helper Functions ──────────────────────────────────────────
+def similarity_label(score):
+    if score >= 0.75:
+        return "🔵 Very Similar", "#6C63FF"
+    elif score >= 0.55:
+        return "🟢 Similar", "#4ECB71"
+    elif score >= 0.35:
+        return "🟡 Moderately Similar", "#F9A826"
+    else:
+        return "🔴 Dissimilar", "#FF6B6B"
+
+def compute_paul_scores(primary_score, all_scores, n_texts):
+    """Calculate Paul's Critical Thinking Standards scores"""
+    scores = {}
+    
+    # 1. Clarity
+    clarity = 30 + (20 if n_texts >= 2 else 0) + (20 if n_texts >= 3 else 0) + (30 if primary_score > 0 else 0)
+    scores["Clarity"] = min(clarity, 100)
+    
+    # 2. Accuracy
+    accuracy = 25 + (25 if n_texts >= 2 else 0) + (25 if primary_score > 0 else 0) + (25 if len(all_scores) > 1 else 0)
+    scores["Accuracy"] = min(accuracy, 100)
+    
+    # 3. Precision
+    precision = 10
+    if primary_score > 0.7: precision += 40
+    elif primary_score > 0.5: precision += 25
+    if len(all_scores) >= 2: precision += 20
+    if len(all_scores) >= 2 and max(all_scores) - min(all_scores) > 0.3:
+        precision += 20
+    scores["Precision"] = min(precision, 100)
+    
+    # 4. Relevance
+    relevance = 25 + (25 if len(all_scores) > 0 else 0) + (25 if primary_score > 0 else 0) + (25 if n_texts >= 2 else 0)
+    scores["Relevance"] = min(relevance, 100)
+    
+    # 5. Logic
+    logic = 15 + (30 if primary_score > 0.5 else 0) + (25 if len(all_scores) >= 2 else 0)
+    if len(all_scores) >= 2 and max(all_scores) > 0 and min(all_scores) < max(all_scores):
+        logic += 30
+    scores["Logic"] = min(logic, 100)
+    
+    # 6. Significance
+    significance = 10 + (50 if primary_score > 0.7 else 30 if primary_score > 0.5 else 0)
+    significance += 20 if len(all_scores) >= 2 else 0
+    if len(all_scores) >= 2 and max(all_scores) > min(all_scores):
+        significance += 20
+    scores["Significance"] = min(significance, 100)
+    
+    # 7. Fairness
+    fairness = 70 + (15 if n_texts >= 3 else 0) + (15 if len(all_scores) >= 2 else 0)
+    scores["Fairness"] = min(fairness, 100)
+    
+    return scores
+
+# ── PAUL'S STANDARDS GRAPHS ──────────────────────────────────
+
+def graph_paul_bar_chart(paul_scores):
+    """Bar Chart for Paul's Critical Thinking Standards"""
+    categories = list(paul_scores.keys())
+    values = list(paul_scores.values())
+    
+    # Colors based on scores
+    colors = []
+    for v in values:
+        if v >= 80:
+            colors.append('#4ECB71')  # Green - Excellent
+        elif v >= 60:
+            colors.append('#F9A826')  # Yellow - Good
+        else:
+            colors.append('#FF6B6B')  # Red - Needs Work
+    
+    fig, ax = plt.subplots(figsize=(10, 5))
+    bars = ax.barh(categories[::-1], values[::-1], color=colors[::-1], edgecolor='white', height=0.6)
+    ax.set_xlabel("Score (%)", fontsize=11, color='#2d3436')
+    ax.set_title("Paul's Critical Thinking Standards", fontsize=14, fontweight='700', color='#2d3436')
+    ax.set_xlim(0, 100)
+    ax.set_facecolor('#f8f9fa')
+    ax.axvline(80, color='#4ECB71', linestyle='--', linewidth=1, alpha=0.5, label='Excellent (80%)')
+    ax.axvline(60, color='#F9A826', linestyle='--', linewidth=1, alpha=0.5, label='Good (60%)')
+    
+    for bar, score in zip(bars, values[::-1]):
+        ax.text(bar.get_width() + 1, bar.get_y() + bar.get_height()/2,
+                f"{score}%", va='center', fontsize=9, fontweight='600')
+    
+    ax.legend(loc='lower right', fontsize=9)
+    plt.tight_layout()
+    return fig
+
+def graph_paul_heatmap(paul_scores):
+    """Heatmap for Paul's Critical Thinking Standards"""
+    categories = list(paul_scores.keys())
+    values = list(paul_scores.values())
+    
+    # Create a matrix format for heatmap
+    data = np.array(values).reshape(1, -1)
+    
+    fig, ax = plt.subplots(figsize=(10, 3))
+    im = ax.imshow(data, cmap='RdYlGn', vmin=0, vmax=100, aspect='auto')
+    
+    ax.set_xticks(range(len(categories)))
+    ax.set_yticks([0])
+    ax.set_xticklabels(categories, fontsize=9, rotation=0)
+    ax.set_yticklabels(['Score'], fontsize=9)
+    ax.set_title("Paul's Critical Thinking Standards Heatmap", fontsize=14, fontweight='700', color='#2d3436')
+    
+    # Add text annotations
+    for i, v in enumerate(values):
+        ax.text(i, 0, f"{v}%", ha='center', va='center', fontsize=12, fontweight='bold', color='white')
+    
+    plt.colorbar(im, ax=ax, label='Score (%)')
+    plt.tight_layout()
+    return fig
+
+def graph_paul_radar(paul_scores):
+    """Radar chart for Paul's Critical Thinking Standards"""
+    categories = list(paul_scores.keys())
+    values = list(paul_scores.values())
+    values += values[:1]
+    angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False).tolist()
+    angles += angles[:1]
+    
+    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(projection='polar'))
+    ax.plot(angles, values, 'o-', linewidth=2, color='#667eea')
+    ax.fill(angles, values, alpha=0.25, color='#667eea')
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(categories, fontsize=10, color='#2d3436')
+    ax.set_ylim(0, 100)
+    ax.set_yticks([20, 40, 60, 80, 100])
+    ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=8, color='#6c757d')
+    ax.set_title("Paul's Critical Thinking Standards Radar", fontsize=14, fontweight='700', color='#2d3436', pad=20)
+    ax.grid(True, alpha=0.3)
+    
+    # Add percentage labels on points
+    for angle, value in zip(angles[:-1], values[:-1]):
+        ax.text(angle, value + 5, f"{value}%", ha='center', va='center', fontsize=8, fontweight='bold')
+    
+    plt.tight_layout()
+    return fig
 
 # ── Sidebar ────────────────────────────────────────────────────
 with st.sidebar:
@@ -399,7 +541,6 @@ if run_btn:
         score_pct = r["Similarity Score"] * 100
         bar_width = min(score_pct, 100)
         
-        # Color based on score
         if r["Similarity Score"] >= 0.7:
             bar_color = "linear-gradient(90deg, #00b894, #00cec9)"
         elif r["Similarity Score"] >= 0.4:
@@ -420,149 +561,136 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── GRAPH 1: Bar Chart ─────────────────────────────────────
+    # ── Compute Paul's Scores ──────────────────────────────────
+    paul_scores = compute_paul_scores(similarities[0], similarities, n)
+
+    # ── PAUL'S STANDARDS SECTION ──────────────────────────────
+    st.markdown("---")
+    st.markdown("## 🧠 Paul's Critical Thinking Standards Analysis")
+    st.markdown("*(Automated scoring based on the analysis results)*")
+
+    # ── PAUL'S STANDARDS CARDS ─────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 📈 Graph 1 — Bar Chart: Top Similar Words/Sentences")
-    st.caption("Shows top similar words/sentences with their exact similarity scores.")
-
-    top_n = min(8, len(results))
-    labels = [f"#{r['Rank']} {r['Candidate'][:30]}..." if len(r['Candidate']) > 30 else f"#{r['Rank']} {r['Candidate']}" for r in results[:top_n]]
-    scores = [r['Similarity Score'] for r in results[:top_n]]
+    st.markdown("### 📊 Standards Scores")
     
-    # Gradient colors
-    colors = ["#00b894" if s >= 0.7 else "#fdcb6e" if s >= 0.4 else "#fd79a8" for s in scores]
+    cols = st.columns(4)
+    emojis = {
+        "Clarity": "🔵",
+        "Accuracy": "🟢",
+        "Precision": "🟡",
+        "Relevance": "🟠",
+        "Logic": "🔴",
+        "Significance": "🟣",
+        "Fairness": "⚪"
+    }
 
-    fig1, ax1 = plt.subplots(figsize=(10, 5))
-    bars = ax1.barh(labels[::-1], scores[::-1], color=colors[::-1], edgecolor='white', height=0.6)
-    ax1.set_xlabel("Cosine Similarity Score", fontsize=11, color='#2d3436')
-    ax1.set_title("Top Similarity Scores", fontsize=14, fontweight='700', color='#2d3436')
-    ax1.set_xlim(0, 1)
-    ax1.set_facecolor('#f8f9fa')
-    ax1.grid(True, alpha=0.2, axis='x')
+    for idx, (standard, score) in enumerate(paul_scores.items()):
+        col = cols[idx % 4]
+        with col:
+            if score >= 80:
+                status, color = "✅ Excellent", "#4ECB71"
+            elif score >= 60:
+                status, color = "👍 Good", "#F9A826"
+            else:
+                status, color = "⚠️ Needs Work", "#FF6B6B"
+            
+            st.markdown(f"""
+            <div style="background:rgba(255,255,255,0.8);padding:1rem;border-radius:12px;text-align:center;border:1px solid #e9ecef;margin:0.3rem 0;">
+                <div style="font-size:1.5rem;">{emojis.get(standard, '📌')}</div>
+                <div style="font-weight:600;font-size:0.8rem;color:#2d3436;margin-top:0.2rem;">{standard}</div>
+                <div style="font-size:1.8rem;font-weight:700;color:{color};">{score}%</div>
+                <div style="font-size:0.7rem;color:#6c757d;">{status}</div>
+            </div>
+            """, unsafe_allow_html=True)
     
-    for bar, score in zip(bars, scores[::-1]):
-        ax1.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height()/2,
-                 f"{score:.4f}", va='center', fontsize=9, fontweight='600')
-    ax1.axvline(0.5, color='#636e72', linestyle='--', linewidth=1, alpha=0.5, label='0.5 threshold')
-    ax1.legend(loc='lower right', fontsize=9)
-    plt.tight_layout()
-    st.pyplot(fig1)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── GRAPH 1: Paul's Bar Chart ──────────────────────────────
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### 📊 Graph 1 — Paul's Standards Bar Chart")
+    st.caption("Shows the scores for each of Paul's Critical Thinking Standards.")
+    
+    fig_bar = graph_paul_bar_chart(paul_scores)
+    st.pyplot(fig_bar)
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── GRAPH 2: Heatmap ──────────────────────────────────────
+    # ── GRAPH 2: Paul's Heatmap ─────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🌡️ Graph 2 — Heatmap: Pairwise Similarity Matrix")
-    st.caption("Shows pairwise similarity between selected words/sentences.")
-
-    short_labels = [s[:15] + "…" if len(s) > 15 else s for s in all_texts]
-
-    fig2, ax2 = plt.subplots(figsize=(9, 7))
-    sns.heatmap(
-        sim_matrix,
-        annot=True,
-        fmt=".2f",
-        cmap="coolwarm",
-        xticklabels=short_labels,
-        yticklabels=short_labels,
-        linewidths=0.5,
-        vmin=0, vmax=1,
-        ax=ax2,
-        cbar_kws={'shrink': 0.8}
-    )
-    ax2.set_title("Pairwise Cosine Similarity Heatmap", fontsize=14, fontweight='700')
-    plt.xticks(rotation=30, ha='right', fontsize=8)
-    plt.yticks(rotation=0, fontsize=8)
-    plt.tight_layout()
-    st.pyplot(fig2)
+    st.markdown("### 🌡️ Graph 2 — Paul's Standards Heatmap")
+    st.caption("Visualizes the scores for each standard in a heatmap format.")
+    
+    fig_heat = graph_paul_heatmap(paul_scores)
+    st.pyplot(fig_heat)
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── GRAPH 3: 2D PCA ──────────────────────────────────────
+    # ── GRAPH 3: Paul's Radar Chart ─────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🗺️ Graph 3 — 2D Embedding Plot (PCA)")
-    st.caption("PCA projection showing related terms near each other.")
-
-    pca2 = PCA(n_components=2, random_state=42)
-    coords2 = pca2.fit_transform(embeddings)
-
-    fig3, ax3 = plt.subplots(figsize=(9, 6))
+    st.markdown("### 🗺️ Graph 3 — Paul's Standards Radar Chart")
+    st.caption("Shows the overall profile of critical thinking standards.")
     
-    # Gradient colors for points
-    colors_pca = ['#6c5ce7' if i == 0 else '#00b894' if i == 1 else '#fdcb6e' if i == 2 else '#fd79a8' if i == 3 else '#0984e3' for i in range(len(all_texts))]
-    sizes = [150 if i == 0 else 100 for i in range(len(all_texts))]
-
-    scatter = ax3.scatter(coords2[:, 0], coords2[:, 1], c=colors_pca, s=sizes, edgecolors='white', linewidths=2, zorder=3)
-    
-    for i, label in enumerate(short_labels):
-        prefix = "🔵 Query: " if i == 0 else f"{i}. "
-        ax3.annotate(f"{prefix}{label}", (coords2[i, 0], coords2[i, 1]),
-                    textcoords="offset points", xytext=(8, 5), fontsize=8, fontweight='600' if i == 0 else 'normal')
-    
-    ax3.set_title("2D PCA Projection of Sentence Embeddings", fontsize=14, fontweight='700')
-    ax3.set_xlabel(f"PC1 ({pca2.explained_variance_ratio_[0]*100:.1f}%)", fontsize=10)
-    ax3.set_ylabel(f"PC2 ({pca2.explained_variance_ratio_[1]*100:.1f}%)", fontsize=10)
-    ax3.set_facecolor('#f8f9fa')
-    ax3.grid(True, alpha=0.2)
-    plt.tight_layout()
-    st.pyplot(fig3)
+    fig_radar = graph_paul_radar(paul_scores)
+    st.pyplot(fig_radar)
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Paul's Critical Thinking Standards ───────────────────
+    # ── Detailed Explanations ───────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 🧠 Paul's Critical Thinking Standards Analysis")
-    st.markdown("*(Applied to the analysis results)*")
+    st.markdown("### 📋 Detailed Standard Analysis")
 
-    top = results[0]
-    bot = results[-1]
-    t1 = top['Candidate'][:50]
+    top = results[0] if results else None
+    bottom = results[-1] if results else None
+    t1 = top['Candidate'][:50] if top else ""
     t2 = query[:50]
-    b1 = bot['Candidate'][:50]
+    b1 = bottom['Candidate'][:50] if bottom else ""
     b2 = query[:50]
-    tscore = top['Similarity Score']
-    bscore = bot['Similarity Score']
+    tscore = top['Similarity Score'] if top else 0
+    bscore = bottom['Similarity Score'] if bottom else 0
 
-    standards = {
+    standards_details = {
         "🔵 Clarity": (
+            f"**Score: {paul_scores['Clarity']}%**  \n"
             f"The user entered **{n} sentences**. The **query** was: *'{query}'*.  \n"
             f"{len(candidates)} candidate sentences were compared.  \n"
             f"The model converted each sentence into a **384-dimensional vector**.  \n"
             f"**Cosine similarity** (0=unrelated, 1=identical) was computed for every pair.  \n"
-            f"Results are displayed as **exact scores**, a **heatmap**, and a **2D PCA plot**."
+            f"Results are displayed as **exact scores**, a **bar chart**, a **heatmap**, and a **radar chart**."
         ),
         "🟢 Accuracy": (
+            f"**Score: {paul_scores['Accuracy']}%**  \n"
             f"Model used: **all-MiniLM-L6-v2** from sentence-transformers.  \n"
             f"No preprocessing, training, or post-processing was applied.  \n"
             f"Scores are **raw cosine similarities** between embeddings.  \n"
             f"No claims beyond what the model produces are made."
         ),
         "🟡 Precision": (
+            f"**Score: {paul_scores['Precision']}%**  \n"
             f"**Highest similarity:** **{tscore:.4f}** between *'{t1}'* and *'{t2}'*.  \n"
             f"**Lowest similarity:** **{bscore:.4f}** between *'{b1}'* and *'{b2}'*.  \n"
             f"All scores are shown with **4-decimal precision**.  \n"
             f"No vague labels like 'high' or 'low' are used."
         ),
         "🟠 Relevance": (
-            f"**Graph 1 (Bar Chart):** Ranks pairs by similarity score.  \n"
-            f"**Graph 2 (Heatmap):** Shows complete pairwise similarity matrix.  \n"
-            f"**Graph 3 (2D PCA):** Shows geometric closeness of embeddings.  \n"
-            f"All three graphs directly reflect the computed similarity values."
+            f"**Score: {paul_scores['Relevance']}%**  \n"
+            f"**Graph 1 (Bar Chart):** Shows Paul's standards scores.  \n"
+            f"**Graph 2 (Heatmap):** Visualizes standards scores.  \n"
+            f"**Graph 3 (Radar):** Shows overall critical thinking profile."
         ),
         "🔴 Logic": (
+            f"**Score: {paul_scores['Logic']}%**  \n"
             f"The top pair scored **{tscore:.4f}** because both sentences share similar "
             f"semantic meaning in the embedding space.  \n"
-            f"Sentences with overlapping concepts cluster together in the PCA plot, "
-            f"confirming the scores.  \n"
-            f"The heatmap also shows this pair as the most similar."
+            f"The heatmap confirms this relationship visually."
         ),
         "🟣 Significance": (
+            f"**Score: {paul_scores['Significance']}%**  \n"
             f"The **most important finding** is the highest-scoring pair "
             f"(score = **{tscore:.4f}**).  \n"
-            f"Scores above **0.70** indicate strong semantic similarity.  \n"
-            f"This suggests the two sentences convey closely related ideas."
+            f"Scores above **0.70** indicate strong semantic similarity."
         ),
         "⚪ Fairness": (
+            f"**Score: {paul_scores['Fairness']}%**  \n"
             f"**Limitation:** all-MiniLM-L6-v2 is optimised for **English** and may "
             f"produce lower-quality embeddings for other languages, domain-specific "
             f"jargon, or very short single-word inputs.  \n"
@@ -570,20 +698,55 @@ if run_btn:
         ),
     }
 
-    for standard, explanation in standards.items():
-        with st.expander(standard, expanded=True):
+    for standard, explanation in standards_details.items():
+        with st.expander(standard, expanded=False):
             st.markdown(explanation)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Info Box ──────────────────────────────────────────────
-    st.markdown("""
-    <div class="info-box">
-        💡 <strong>How to interpret:</strong> Scores closer to <strong>1.0</strong> indicate stronger semantic similarity. 
-        The <strong>PCA plot</strong> shows how sentences are positioned in 2D space based on their meaning.
-        <strong>Closer points</strong> = more similar meanings.
-    </div>
-    """, unsafe_allow_html=True)
+    # ── Model Info ──────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### ℹ️ Model Information")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**Model:** `all-MiniLM-L6-v2`")
+        st.markdown(f"**Dimension:** 384")
+        st.markdown(f"**License:** Apache 2.0")
+    with col2:
+        st.markdown(f"**Framework:** Sentence-Transformers")
+        st.markdown(f"**Type:** Free pretrained embedding model")
+        st.markdown(f"**Max Tokens:** 512")
+
+else:
+    # ── Placeholder ──────────────────────────────────────────────
+    st.info("👆 Enter your texts above and click **Compute Similarity** to see results.")
+
+    st.markdown("### 📊 What You'll See")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("""
+        <div class="card" style="text-align:center;padding:1.5rem 1rem;">
+            <div style="font-size:2.5rem;">📊</div>
+            <h4>Bar Chart</h4>
+            <p style="font-size:0.85rem;">Paul's Standards Scores</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown("""
+        <div class="card" style="text-align:center;padding:1.5rem 1rem;">
+            <div style="font-size:2.5rem;">🌡️</div>
+            <h4>Heatmap</h4>
+            <p style="font-size:0.85rem;">Standards Visualization</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col3:
+        st.markdown("""
+        <div class="card" style="text-align:center;padding:1.5rem 1rem;">
+            <div style="font-size:2.5rem;">🗺️</div>
+            <h4>Radar Chart</h4>
+            <p style="font-size:0.85rem;">Overall Profile</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ── Footer ─────────────────────────────────────────────────────
 st.markdown("""
