@@ -1,3 +1,9 @@
+# ================================================================
+#  NLP Quiz – Text/Word Similarity App
+#  Model  : all-MiniLM-L6-v2  (free, no training, no preprocessing)
+#  Deploy : Streamlit Community Cloud
+# ================================================================
+
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,20 +16,19 @@ from sentence_transformers import SentenceTransformer
 import pandas as pd
 import time
 
+# ── Page config ──────────────────────────────────────────────
 st.set_page_config(
     page_title="NLP Similarity Explorer",
     page_icon="🔍",
     layout="wide"
 )
 
+# ── Custom CSS with Interactive Colors ──────────────────────
 st.markdown("""
 <style>
-    /* Main gradient background */
     .stApp {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     }
-    
-    /* Card with interactive hover */
     .card {
         background: rgba(255,255,255,0.9);
         backdrop-filter: blur(10px);
@@ -38,8 +43,6 @@ st.markdown("""
         transform: translateY(-4px);
         box-shadow: 0 12px 48px rgba(31, 38, 135, 0.25);
     }
-    
-    /* Header gradient */
     .header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 1.8rem 2rem;
@@ -69,8 +72,6 @@ st.markdown("""
         margin-right: 0.4rem;
         border: 1px solid rgba(255,255,255,0.1);
     }
-    
-    /* Interactive buttons */
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -85,11 +86,6 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
     }
-    .stButton > button:active {
-        transform: scale(0.95);
-    }
-    
-    /* Query highlight */
     .query-box {
         background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
         padding: 0.8rem 1rem;
@@ -100,8 +96,6 @@ st.markdown("""
     .query-box strong {
         color: #667eea;
     }
-    
-    /* Candidate items */
     .candidate-item {
         padding: 0.5rem 0.8rem;
         margin: 0.2rem 0;
@@ -130,8 +124,6 @@ st.markdown("""
         font-weight: 700;
         margin-right: 0.5rem;
     }
-    
-    /* Metric boxes */
     .metric-box {
         background: white;
         padding: 0.8rem 1rem;
@@ -160,8 +152,6 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-    
-    /* Progress bars */
     .progress-container {
         width: 100%;
         height: 6px;
@@ -175,8 +165,6 @@ st.markdown("""
         border-radius: 3px;
         transition: width 1s ease;
     }
-    
-    /* Result rows */
     .result-row {
         display: flex;
         justify-content: space-between;
@@ -205,8 +193,6 @@ st.markdown("""
         width: 80px;
         text-align: right;
     }
-    
-    /* Info box */
     .info-box {
         background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
         border-left: 4px solid #667eea;
@@ -215,20 +201,6 @@ st.markdown("""
         margin: 1rem 0;
         color: #2d3436;
     }
-    
-    /* Sidebar */
-    .css-1d391kg {
-        background: rgba(255,255,255,0.9);
-        backdrop-filter: blur(10px);
-    }
-    
-    .divider {
-        border: none;
-        border-top: 2px dashed #dee2e6;
-        margin: 1.5rem 0;
-    }
-    
-    /* Footer */
     .footer {
         text-align: center;
         color: #6c757d;
@@ -236,6 +208,14 @@ st.markdown("""
         padding: 1rem 0;
         border-top: 1px solid #dee2e6;
         margin-top: 2rem;
+    }
+    .paul-score-card {
+        background: rgba(255,255,255,0.8);
+        padding: 0.8rem;
+        border-radius: 12px;
+        text-align: center;
+        border: 1px solid #e9ecef;
+        margin: 0.3rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -255,6 +235,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Load model ────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     return SentenceTransformer("all-MiniLM-L6-v2")
@@ -264,6 +245,7 @@ with st.spinner("🔄 Loading pretrained model (all-MiniLM-L6-v2)…"):
 
 st.success("✅ Model loaded: all-MiniLM-L6-v2")
 
+# ── Helper Functions ──────────────────────────────────────────
 def similarity_label(score):
     if score >= 0.75:
         return "🔵 Very Similar", "#6C63FF"
@@ -278,15 +260,12 @@ def compute_paul_scores(primary_score, all_scores, n_texts):
     """Calculate Paul's Critical Thinking Standards scores"""
     scores = {}
     
-    # 1. Clarity
     clarity = 30 + (20 if n_texts >= 2 else 0) + (20 if n_texts >= 3 else 0) + (30 if primary_score > 0 else 0)
     scores["Clarity"] = min(clarity, 100)
     
-    # 2. Accuracy
     accuracy = 25 + (25 if n_texts >= 2 else 0) + (25 if primary_score > 0 else 0) + (25 if len(all_scores) > 1 else 0)
     scores["Accuracy"] = min(accuracy, 100)
     
-    # 3. Precision
     precision = 10
     if primary_score > 0.7: precision += 40
     elif primary_score > 0.5: precision += 25
@@ -295,43 +274,31 @@ def compute_paul_scores(primary_score, all_scores, n_texts):
         precision += 20
     scores["Precision"] = min(precision, 100)
     
-    # 4. Relevance
     relevance = 25 + (25 if len(all_scores) > 0 else 0) + (25 if primary_score > 0 else 0) + (25 if n_texts >= 2 else 0)
     scores["Relevance"] = min(relevance, 100)
     
-    # 5. Logic
     logic = 15 + (30 if primary_score > 0.5 else 0) + (25 if len(all_scores) >= 2 else 0)
     if len(all_scores) >= 2 and max(all_scores) > 0 and min(all_scores) < max(all_scores):
         logic += 30
     scores["Logic"] = min(logic, 100)
     
-    # 6. Significance
     significance = 10 + (50 if primary_score > 0.7 else 30 if primary_score > 0.5 else 0)
     significance += 20 if len(all_scores) >= 2 else 0
     if len(all_scores) >= 2 and max(all_scores) > min(all_scores):
         significance += 20
     scores["Significance"] = min(significance, 100)
     
-    # 7. Fairness
     fairness = 70 + (15 if n_texts >= 3 else 0) + (15 if len(all_scores) >= 2 else 0)
     scores["Fairness"] = min(fairness, 100)
     
     return scores
 
-
+# ── GRAPH 1: Paul's Bar Chart ────────────────────────────────
 def graph_paul_bar_chart(paul_scores):
     categories = list(paul_scores.keys())
     values = list(paul_scores.values())
     
-    # Colors based on scores
-    colors = []
-    for v in values:
-        if v >= 80:
-            colors.append('#4ECB71')  # Green - Excellent
-        elif v >= 60:
-            colors.append('#F9A826')  # Yellow - Good
-        else:
-            colors.append('#FF6B6B')  # Red - Needs Work
+    colors = ['#4ECB71' if v >= 80 else '#F9A826' if v >= 60 else '#FF6B6B' for v in values]
     
     fig, ax = plt.subplots(figsize=(10, 5))
     bars = ax.barh(categories[::-1], values[::-1], color=colors[::-1], edgecolor='white', height=0.6)
@@ -350,10 +317,10 @@ def graph_paul_bar_chart(paul_scores):
     plt.tight_layout()
     return fig
 
+# ── GRAPH 2: Paul's Heatmap ──────────────────────────────────
 def graph_paul_heatmap(paul_scores):
     categories = list(paul_scores.keys())
     values = list(paul_scores.values())
-    
     data = np.array(values).reshape(1, -1)
     
     fig, ax = plt.subplots(figsize=(10, 3))
@@ -363,7 +330,7 @@ def graph_paul_heatmap(paul_scores):
     ax.set_yticks([0])
     ax.set_xticklabels(categories, fontsize=9, rotation=0)
     ax.set_yticklabels(['Score'], fontsize=9)
-    ax.set_title("Paul's Critical Thinking Standards Heatmap", fontsize=14, fontweight='700', color='#2d3436')
+    ax.set_title("Paul's Standards Heatmap", fontsize=14, fontweight='700', color='#2d3436')
     
     for i, v in enumerate(values):
         ax.text(i, 0, f"{v}%", ha='center', va='center', fontsize=12, fontweight='bold', color='white')
@@ -372,6 +339,7 @@ def graph_paul_heatmap(paul_scores):
     plt.tight_layout()
     return fig
 
+# ── GRAPH 3: Paul's Radar Chart (Smaller) ────────────────────
 def graph_paul_radar(paul_scores):
     categories = list(paul_scores.keys())
     values = list(paul_scores.values())
@@ -379,24 +347,79 @@ def graph_paul_radar(paul_scores):
     angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False).tolist()
     angles += angles[:1]
     
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(projection='polar'))
+    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(projection='polar'))
     ax.plot(angles, values, 'o-', linewidth=2, color='#667eea')
     ax.fill(angles, values, alpha=0.25, color='#667eea')
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(categories, fontsize=10, color='#2d3436')
+    ax.set_xticklabels(categories, fontsize=8, color='#2d3436')
     ax.set_ylim(0, 100)
     ax.set_yticks([20, 40, 60, 80, 100])
-    ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=8, color='#6c757d')
-    ax.set_title("Paul's Critical Thinking Standards Radar", fontsize=14, fontweight='700', color='#2d3436', pad=20)
+    ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=7, color='#6c757d')
+    ax.set_title("Paul's Standards Radar", fontsize=12, fontweight='700', color='#2d3436', pad=15)
     ax.grid(True, alpha=0.3)
     
-    # Add percentage labels on points
     for angle, value in zip(angles[:-1], values[:-1]):
-        ax.text(angle, value + 5, f"{value}%", ha='center', va='center', fontsize=8, fontweight='bold')
+        ax.text(angle, value + 5, f"{value}%", ha='center', va='center', fontsize=7, fontweight='bold')
     
     plt.tight_layout()
     return fig
 
+# ── GRAPH 4: Dynamic Target Plot ─────────────────────────────
+def graph_target_plot(paul_scores):
+    """Dynamic target/bullseye plot showing overall score"""
+    categories = list(paul_scores.keys())
+    values = list(paul_scores.values())
+    avg_score = np.mean(values)
+    
+    fig, ax = plt.subplots(figsize=(6, 6))
+    
+    # Create concentric circles
+    circles = [0.2, 0.4, 0.6, 0.8, 1.0]
+    colors = ['#FF6B6B', '#F9A826', '#F9A826', '#4ECB71', '#4ECB71']
+    for i, (circle, color) in enumerate(zip(circles, colors)):
+        circ = plt.Circle((0.5, 0.5), circle/2, color=color, alpha=0.15, ec='gray', linewidth=0.5)
+        ax.add_patch(circ)
+        # Add labels
+        if i == 0:
+            ax.text(0.5, 0.5 - circle/2 - 0.05, f"{int(circle*100)}%", ha='center', va='top', fontsize=8, color='gray')
+    
+    # Plot the average score as a point
+    target_x = 0.5
+    target_y = 0.5
+    radius = avg_score / 200  # Scale to fit in 0-0.5 range
+    
+    # Draw target point
+    circle = plt.Circle((target_x, target_y), radius, color='#667eea', alpha=0.7, ec='white', linewidth=2)
+    ax.add_patch(circle)
+    
+    # Add score text
+    ax.text(target_x, target_y, f"{avg_score:.1f}%", ha='center', va='center', 
+            fontsize=16, fontweight='bold', color='white')
+    
+    # Add labels for each standard around the circle
+    n = len(categories)
+    for i, (cat, val) in enumerate(zip(categories, values)):
+        angle = (i / n) * 2 * np.pi - np.pi/2
+        x = 0.5 + 0.4 * np.cos(angle)
+        y = 0.5 + 0.4 * np.sin(angle)
+        ax.text(x, y, f"{cat[:4]}", ha='center', va='center', fontsize=7, 
+                color='#2d3436', fontweight='600', 
+                bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+    
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    ax.set_title(f"Overall Critical Thinking Score", fontsize=14, fontweight='700', color='#2d3436')
+    
+    # Add subtitle
+    ax.text(0.5, 0.05, f"Based on {n} Paul's Standards", ha='center', va='center', 
+            fontsize=9, color='#6c757d')
+    
+    plt.tight_layout()
+    return fig
+
+# ── Sidebar ────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ✍️ Input")
     st.markdown("Enter one sentence/word per line (min 2, max 10).")
@@ -427,6 +450,7 @@ with st.sidebar:
     *Free & Pretrained*
     """)
 
+# ── Main logic ────────────────────────────────────────────────
 if run_btn:
 
     sentences = [line.strip() for line in raw_input.strip().split("\n") if line.strip()]
@@ -457,6 +481,7 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── Embed ─────────────────────────────────────────────────
     with st.spinner("🧠 Computing embeddings..."):
         all_texts = [query] + candidates
         embeddings = model.encode(all_texts)
@@ -478,6 +503,27 @@ if run_btn:
 
     n = len(all_texts)
     
+    # ── Display Sentence Scores ──────────────────────────────────
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### 📊 Sentence Similarity Scores")
+    st.caption("Each candidate's similarity score with the query")
+    
+    # Create a nice table
+    score_data = []
+    for r in results:
+        label, color = similarity_label(r['Similarity Score'])
+        score_data.append({
+            "Rank": r['Rank'],
+            "Candidate": r['Candidate'][:50] + ("..." if len(r['Candidate']) > 50 else ""),
+            "Score": f"{r['Similarity Score']:.4f}",
+            "Label": label
+        })
+    
+    df = pd.DataFrame(score_data)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Metrics ─────────────────────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 📊 Summary")
     
@@ -513,6 +559,7 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── Top Results ────────────────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown(f"### 🏆 Top {len(results)} Results")
     
@@ -540,12 +587,14 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── Compute Paul's Scores ──────────────────────────────────
     paul_scores = compute_paul_scores(similarities[0], similarities, n)
 
+    # ── PAUL'S STANDARDS SECTION ──────────────────────────────
     st.markdown("---")
     st.markdown("## 🧠 Paul's Critical Thinking Standards Analysis")
-    st.markdown("*(Automated scoring based on the analysis results)*")
 
+    # ── Paul's Standards Cards ─────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 📊 Standards Scores")
     
@@ -571,7 +620,7 @@ if run_btn:
                 status, color = "⚠️ Needs Work", "#FF6B6B"
             
             st.markdown(f"""
-            <div style="background:rgba(255,255,255,0.8);padding:1rem;border-radius:12px;text-align:center;border:1px solid #e9ecef;margin:0.3rem 0;">
+            <div class="paul-score-card">
                 <div style="font-size:1.5rem;">{emojis.get(standard, '📌')}</div>
                 <div style="font-weight:600;font-size:0.8rem;color:#2d3436;margin-top:0.2rem;">{standard}</div>
                 <div style="font-size:1.8rem;font-weight:700;color:{color};">{score}%</div>
@@ -581,6 +630,7 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── GRAPH 1: Paul's Bar Chart ──────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 📊 Graph 1 — Paul's Standards Bar Chart")
     st.caption("Shows the scores for each of Paul's Critical Thinking Standards.")
@@ -590,6 +640,7 @@ if run_btn:
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── GRAPH 2: Paul's Heatmap ─────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 🌡️ Graph 2 — Paul's Standards Heatmap")
     st.caption("Visualizes the scores for each standard in a heatmap format.")
@@ -599,6 +650,7 @@ if run_btn:
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── GRAPH 3: Paul's Radar Chart (Smaller) ──────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 🗺️ Graph 3 — Paul's Standards Radar Chart")
     st.caption("Shows the overall profile of critical thinking standards.")
@@ -608,6 +660,17 @@ if run_btn:
     plt.close()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── GRAPH 4: Dynamic Target Plot ────────────────────────────
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### 🎯 Graph 4 — Dynamic Target Plot")
+    st.caption("Shows the overall critical thinking score with standards distribution.")
+    
+    fig_target = graph_target_plot(paul_scores)
+    st.pyplot(fig_target)
+    plt.close()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Detailed Explanations ───────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### 📋 Detailed Standard Analysis")
 
@@ -626,47 +689,42 @@ if run_btn:
             f"The user entered **{n} sentences**. The **query** was: *'{query}'*.  \n"
             f"{len(candidates)} candidate sentences were compared.  \n"
             f"The model converted each sentence into a **384-dimensional vector**.  \n"
-            f"**Cosine similarity** (0=unrelated, 1=identical) was computed for every pair.  \n"
-            f"Results are displayed as **exact scores**, a **bar chart**, a **heatmap**, and a **radar chart**."
+            f"**Cosine similarity** (0=unrelated, 1=identical) was computed for every pair."
         ),
         "🟢 Accuracy": (
             f"**Score: {paul_scores['Accuracy']}%**  \n"
             f"Model used: **all-MiniLM-L6-v2** from sentence-transformers.  \n"
             f"No preprocessing, training, or post-processing was applied.  \n"
-            f"Scores are **raw cosine similarities** between embeddings.  \n"
-            f"No claims beyond what the model produces are made."
+            f"Scores are **raw cosine similarities** between embeddings."
         ),
         "🟡 Precision": (
             f"**Score: {paul_scores['Precision']}%**  \n"
             f"**Highest similarity:** **{tscore:.4f}** between *'{t1}'* and *'{t2}'*.  \n"
             f"**Lowest similarity:** **{bscore:.4f}** between *'{b1}'* and *'{b2}'*.  \n"
-            f"All scores are shown with **4-decimal precision**.  \n"
-            f"No vague labels like 'high' or 'low' are used."
+            f"All scores are shown with **4-decimal precision**."
         ),
         "🟠 Relevance": (
             f"**Score: {paul_scores['Relevance']}%**  \n"
             f"**Graph 1 (Bar Chart):** Shows Paul's standards scores.  \n"
             f"**Graph 2 (Heatmap):** Visualizes standards scores.  \n"
-            f"**Graph 3 (Radar):** Shows overall critical thinking profile."
+            f"**Graph 3 (Radar):** Shows overall critical thinking profile.  \n"
+            f"**Graph 4 (Target):** Shows overall score with standards distribution."
         ),
         "🔴 Logic": (
             f"**Score: {paul_scores['Logic']}%**  \n"
             f"The top pair scored **{tscore:.4f}** because both sentences share similar "
-            f"semantic meaning in the embedding space.  \n"
-            f"The heatmap confirms this relationship visually."
+            f"semantic meaning in the embedding space."
         ),
         "🟣 Significance": (
             f"**Score: {paul_scores['Significance']}%**  \n"
             f"The **most important finding** is the highest-scoring pair "
-            f"(score = **{tscore:.4f}**).  \n"
-            f"Scores above **0.70** indicate strong semantic similarity."
+            f"(score = **{tscore:.4f}**). Scores above **0.70** indicate strong semantic similarity."
         ),
         "⚪ Fairness": (
             f"**Score: {paul_scores['Fairness']}%**  \n"
             f"**Limitation:** all-MiniLM-L6-v2 is optimised for **English** and may "
             f"produce lower-quality embeddings for other languages, domain-specific "
-            f"jargon, or very short single-word inputs.  \n"
-            f"It reflects biases present in its training corpus."
+            f"jargon, or very short single-word inputs."
         ),
     }
 
@@ -676,6 +734,7 @@ if run_btn:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── Model Info ──────────────────────────────────────────────
     st.markdown("---")
     st.markdown("### ℹ️ Model Information")
     col1, col2 = st.columns(2)
@@ -689,38 +748,13 @@ if run_btn:
         st.markdown(f"**Max Tokens:** 512")
 
 else:
+    # ── Placeholder ──────────────────────────────────────────────
     st.info("👆 Enter your texts above and click **Compute Similarity** to see results.")
 
     st.markdown("### 📊 What You'll See")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown("""
         <div class="card" style="text-align:center;padding:1.5rem 1rem;">
             <div style="font-size:2.5rem;">📊</div>
-            <h4>Bar Chart</h4>
-            <p style="font-size:0.85rem;">Paul's Standards Scores</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown("""
-        <div class="card" style="text-align:center;padding:1.5rem 1rem;">
-            <div style="font-size:2.5rem;">🌡️</div>
-            <h4>Heatmap</h4>
-            <p style="font-size:0.85rem;">Standards Visualization</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown("""
-        <div class="card" style="text-align:center;padding:1.5rem 1rem;">
-            <div style="font-size:2.5rem;">🗺️</div>
-            <h4>Radar Chart</h4>
-            <p style="font-size:0.85rem;">Overall Profile</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-st.markdown("""
-<div class="footer">
-    Built for NLP Lab Quiz · Model: all-MiniLM-L6-v2 · 
-    No preprocessing · No training · Free pretrained model only
-</div>
-""", unsafe_allow_html=True)
+            <h
