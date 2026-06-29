@@ -1,7 +1,7 @@
 # NLP Text Similarity Explorer
 
 A Streamlit web app that uses the **free pretrained model `all-MiniLM-L6-v2`**  
-to compute and visualise text/sentence similarity — built for the NLP Lab Quiz.
+to compute and visualise text/sentence similarity.
 
 ---
 
@@ -40,9 +40,9 @@ similarity between every pair, and presents results through:
 
 ```
 nlp_similarity_app/
-├── app.py              # Main Streamlit application
-├── requirements.txt    # Python dependencies
-└── README.md           # This file
+├── app.py             
+├── requirements.txt    
+└── README.md      
 ```
 
 ---
