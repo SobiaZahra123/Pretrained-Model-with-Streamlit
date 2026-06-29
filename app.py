@@ -43,20 +43,36 @@ st.markdown("""
     }
     .main-header {
         text-align: center;
-        padding: 1.5rem 0;
-        background: linear-gradient(135deg, #6C63FF, #A78BFA);
-        border-radius: 12px;
-        margin-bottom: 1.5rem;
+        padding: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
     }
     .main-header h1 {
         color: white;
-        font-size: 2.5rem;
+        font-size: 2.8rem;
+        font-weight: 700;
         margin: 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .main-header p {
         color: rgba(255,255,255,0.9);
-        font-size: 1rem;
+        font-size: 1.1rem;
         margin: 0.3rem 0 0 0;
+    }
+    .main-header .tags {
+        margin-top: 0.6rem;
+    }
+    .main-header .tag {
+        display: inline-block;
+        background: rgba(255,255,255,0.2);
+        padding: 0.2rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        color: white;
+        margin: 0 0.2rem;
+        border: 1px solid rgba(255,255,255,0.1);
     }
     .card {
         background: rgba(255,255,255,0.05);
@@ -74,24 +90,72 @@ st.markdown("""
         margin: 0;
     }
     .stButton > button {
-        background: linear-gradient(135deg, #6C63FF, #5A52D5);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border: none;
         border-radius: 8px;
         font-weight: 600;
         padding: 0.5rem 2rem;
+        transition: all 0.3s ease;
     }
     .stButton > button:hover {
-        transform: scale(1.02);
-        box-shadow: 0 4px 20px rgba(108, 99, 255, 0.4);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
     }
     .footer {
         text-align: center;
         color: #6a6a80;
         font-size: 0.75rem;
-        padding: 1rem 0;
+        padding: 1.5rem 0;
         border-top: 1px solid rgba(255,255,255,0.06);
         margin-top: 2rem;
+    }
+    .result-box {
+        background: rgba(255,255,255,0.03);
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        margin: 0.3rem 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-left: 3px solid #667eea;
+    }
+    .score-high {
+        color: #4ECB71;
+        font-weight: 700;
+    }
+    .score-medium {
+        color: #F9A826;
+        font-weight: 700;
+    }
+    .score-low {
+        color: #FF6B6B;
+        font-weight: 700;
+    }
+    .paul-card {
+        background: rgba(255,255,255,0.03);
+        border-radius: 10px;
+        padding: 1rem;
+        border: 1px solid rgba(255,255,255,0.06);
+        margin: 0.5rem 0;
+        text-align: center;
+    }
+    .paul-card .emoji {
+        font-size: 1.8rem;
+    }
+    .paul-card .standard {
+        font-weight: 600;
+        color: #f0f0f8;
+        font-size: 0.85rem;
+    }
+    .paul-card .score {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0.2rem 0;
+    }
+    .paul-card .status {
+        font-size: 0.7rem;
+        color: #8e8ea0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -103,8 +167,10 @@ st.markdown("""
 def load_model():
     return SentenceTransformer(MODEL_NAME)
 
-with st.spinner(f"Loading {MODEL_NAME}..."):
+with st.spinner(f"🔄 Loading {MODEL_NAME}..."):
     model = load_model()
+
+st.success(f"✅ Model loaded: {MODEL_NAME}")
 
 # ──────────────────────────────────────────────────────────────
 #  Helper Functions
@@ -123,40 +189,57 @@ def compute_paul_scores(primary_score, all_scores, n_texts):
     """Calculate Paul's Critical Thinking Standards scores"""
     scores = {}
     
-    # Clarity
-    clarity = 30 + (20 if n_texts >= 2 else 0) + (20 if n_texts >= 3 else 0) + (30 if primary_score > 0 else 0)
+    # 1. Clarity
+    clarity = 30
+    if n_texts >= 2: clarity += 20
+    if n_texts >= 3: clarity += 20
+    if primary_score > 0: clarity += 30
     scores["Clarity"] = min(clarity, 100)
     
-    # Accuracy
-    accuracy = 25 + (25 if n_texts >= 2 else 0) + (25 if primary_score > 0 else 0) + (25 if len(all_scores) > 1 else 0)
+    # 2. Accuracy
+    accuracy = 25
+    if n_texts >= 2: accuracy += 25
+    if primary_score > 0: accuracy += 25
+    if len(all_scores) > 1: accuracy += 25
     scores["Accuracy"] = min(accuracy, 100)
     
-    # Precision
-    precision = 10 + (40 if primary_score > 0.7 else 25 if primary_score > 0.5 else 0)
-    precision += 20 if len(all_scores) >= 2 else 0
+    # 3. Precision
+    precision = 10
+    if primary_score > 0.7: precision += 40
+    elif primary_score > 0.5: precision += 25
+    if len(all_scores) >= 2: precision += 20
     if len(all_scores) >= 2 and max(all_scores) - min(all_scores) > 0.3:
         precision += 20
     scores["Precision"] = min(precision, 100)
     
-    # Relevance
-    relevance = 25 + (25 if len(all_scores) > 0 else 0) + (25 if primary_score > 0 else 0) + (25 if n_texts >= 2 else 0)
+    # 4. Relevance
+    relevance = 25
+    if len(all_scores) > 0: relevance += 25
+    if primary_score > 0: relevance += 25
+    if n_texts >= 2: relevance += 25
     scores["Relevance"] = min(relevance, 100)
     
-    # Logic
-    logic = 15 + (30 if primary_score > 0.5 else 0) + (25 if len(all_scores) >= 2 else 0)
+    # 5. Logic
+    logic = 15
+    if primary_score > 0.5: logic += 30
+    if len(all_scores) >= 2: logic += 25
     if len(all_scores) >= 2 and max(all_scores) > 0 and min(all_scores) < max(all_scores):
         logic += 30
     scores["Logic"] = min(logic, 100)
     
-    # Significance
-    significance = 10 + (50 if primary_score > 0.7 else 30 if primary_score > 0.5 else 0)
-    significance += 20 if len(all_scores) >= 2 else 0
+    # 6. Significance
+    significance = 10
+    if primary_score > 0.7: significance += 50
+    elif primary_score > 0.5: significance += 30
+    if len(all_scores) >= 2: significance += 20
     if len(all_scores) >= 2 and max(all_scores) > min(all_scores):
         significance += 20
     scores["Significance"] = min(significance, 100)
     
-    # Fairness
-    fairness = 70 + (15 if n_texts >= 3 else 0) + (15 if len(all_scores) >= 2 else 0)
+    # 7. Fairness
+    fairness = 70
+    if n_texts >= 3: fairness += 15
+    if len(all_scores) >= 2: fairness += 15
     scores["Fairness"] = min(fairness, 100)
     
     return scores
@@ -256,8 +339,8 @@ def graph_paul_radar(scores):
     angles += angles[:1]
     
     fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(projection='polar'))
-    ax.plot(angles, values, 'o-', linewidth=2, color='#6C63FF')
-    ax.fill(angles, values, alpha=0.25, color='#6C63FF')
+    ax.plot(angles, values, 'o-', linewidth=2, color='#667eea')
+    ax.fill(angles, values, alpha=0.25, color='#667eea')
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(categories, color='white')
     ax.set_ylim(0, 100)
@@ -274,15 +357,22 @@ def graph_paul_radar(scores):
 #  Main App
 # ──────────────────────────────────────────────────────────────
 def main():
-    # Header
+    # ── Header ──────────────────────────────────────────────────
     st.markdown("""
     <div class="main-header">
         <h1>🔮 NLP Similarity Explorer</h1>
-        <p>Compare text similarity using <strong>all-MiniLM-L6-v2</strong> · Free · No training · No preprocessing</p>
+        <p>Compare text similarity using <strong>all-MiniLM-L6-v2</strong></p>
+        <div class="tags">
+            <span class="tag">✨ No Preprocessing</span>
+            <span class="tag">🎯 No Training</span>
+            <span class="tag">🚀 No Paid API</span>
+            <span class="tag">📊 3 Visualizations</span>
+            <span class="tag">🧠 Paul's Standards</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Input Section
+    # ── Input Section ──────────────────────────────────────────
     st.markdown("### ✍️ Enter Your Texts")
     st.caption("Enter 2 to 6 texts. The model computes cosine similarity between ALL pairs.")
 
@@ -314,7 +404,8 @@ def main():
 
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        top_k = st.slider("Top-K results to show", min_value=1, max_value=min(5, n_inputs-1), value=min(3, n_inputs-1))
+        max_top_k = min(5, n_inputs - 1)
+        top_k = st.slider("Top-K results to show", min_value=1, max_value=max_top_k, value=min(3, max_top_k))
     with col2:
         run_btn = st.button("🚀 Analyze", use_container_width=True)
     with col3:
@@ -324,19 +415,20 @@ def main():
                     del st.session_state[f"text_{i}"]
             st.rerun()
 
+    # ── Analysis ───────────────────────────────────────────────
     if run_btn:
         clean_texts = [t.strip() for t in texts if t.strip()]
         if len(clean_texts) < 2:
             st.warning("⚠️ Please enter at least 2 non-empty texts.")
             st.stop()
 
-        # ── Compute Embeddings ──────────────────────────────────
-        with st.spinner("Generating embeddings..."):
+        # Compute Embeddings
+        with st.spinner("🔄 Generating embeddings..."):
             start_time = time.time()
             embeddings = model.encode(clean_texts)
             elapsed_ms = (time.time() - start_time) * 1000
 
-        # ── Compute Similarity ──────────────────────────────────
+        # Compute Similarity
         matrix = cosine_similarity(embeddings)
         primary_score = matrix[0][1]
         label, color = similarity_label(primary_score)
@@ -352,10 +444,9 @@ def main():
         top_results.sort(key=lambda x: x['score'], reverse=True)
         top_results = top_results[:top_k]
 
-        # ── Paul's Standards ────────────────────────────────────
         paul_scores = compute_paul_scores(primary_score, all_scores, len(clean_texts))
 
-        # ── Store in session ────────────────────────────────────
+        # Store in session
         st.session_state.current = {
             "texts": clean_texts,
             "embeddings": embeddings,
@@ -367,16 +458,14 @@ def main():
             "elapsed_ms": elapsed_ms,
         }
 
-        # ── Results Display ─────────────────────────────────────
-
-        # Success Banner
+        # ── Success Banner ──────────────────────────────────────
         st.markdown(f"""
-        <div style="background:rgba(108,99,255,0.12);border:1px solid rgba(108,99,255,0.25);border-radius:12px;padding:1rem;margin:1rem 0;">
+        <div style="background:rgba(102,126,234,0.12);border:1px solid rgba(102,126,234,0.25);border-radius:12px;padding:1rem;margin:1rem 0;">
             <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
                 <span style="font-size:2rem;">✅</span>
                 <span style="font-weight:600;color:#f0f0f8;">Analysis Complete</span>
                 <span style="color:#8e8ea0;">Primary similarity score:</span>
-                <span style="font-weight:700;color:#6C63FF;font-size:1.3rem;">{primary_score:.4f}</span>
+                <span style="font-weight:700;color:#667eea;font-size:1.3rem;">{primary_score:.4f}</span>
                 <span style="font-size:0.9rem;color:#a8a8c0;">({label})</span>
                 <span style="color:#6a6a80;font-size:0.8rem;">| Time: {elapsed_ms:.0f}ms</span>
             </div>
@@ -389,9 +478,9 @@ def main():
         for i, r in enumerate(top_results, 1):
             lbl, col = similarity_label(r['score'])
             st.markdown(f"""
-            <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:0.6rem 1rem;margin:0.3rem 0;display:flex;justify-content:space-between;align-items:center;">
+            <div class="result-box">
                 <div>
-                    <span style="font-weight:600;color:#6C63FF;">#{i}</span>
+                    <span style="font-weight:600;color:#667eea;">#{i}</span>
                     <span style="color:#f0f0f8;margin-left:0.8rem;">{r['text']}</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.8rem;">
@@ -404,7 +493,7 @@ def main():
         st.markdown("---")
 
         # ── GRAPH 1: Bar Chart ──────────────────────────────────
-        st.markdown("### 📊 Graph 1 — Bar Chart: Top Similar Words/Sentences")
+        st.markdown("### 📊 Graph 1 — Bar Chart")
         st.caption("Shows top similar words/sentences with their exact similarity scores.")
         fig_bar = graph_bar_chart(top_results)
         st.pyplot(fig_bar)
@@ -413,7 +502,7 @@ def main():
         st.markdown("---")
 
         # ── GRAPH 2: Heatmap ────────────────────────────────────
-        st.markdown("### 🌡️ Graph 2 — Heatmap: Pairwise Similarity Matrix")
+        st.markdown("### 🌡️ Graph 2 — Heatmap")
         st.caption("Shows pairwise similarity between selected words/sentences.")
         fig_heat = graph_heatmap(matrix, clean_texts)
         st.pyplot(fig_heat)
@@ -422,7 +511,7 @@ def main():
         st.markdown("---")
 
         # ── GRAPH 3: 2D PCA ─────────────────────────────────────
-        st.markdown("### 🗺️ Graph 3 — 2D Embedding Plot (PCA)")
+        st.markdown("### 🗺️ Graph 3 — 2D PCA Embedding Plot")
         st.caption("PCA projection showing related terms near each other.")
         fig_pca = graph_pca(embeddings, clean_texts)
         st.pyplot(fig_pca)
@@ -430,28 +519,62 @@ def main():
 
         st.markdown("---")
 
-        # ── GRAPH 4: Paul's Radar (Bonus) ──────────────────────
-        st.markdown("### 🧠 Paul's Critical Thinking Standards Radar")
+        # ── Paul's Critical Thinking Standards ──────────────────
+        st.markdown("### 🧠 Paul's Critical Thinking Standards")
+
+        # Scores Grid
+        cols = st.columns(4)
+        emojis = {
+            "Clarity": "🔵",
+            "Accuracy": "🟢",
+            "Precision": "🟡",
+            "Relevance": "🟠",
+            "Logic": "🔴",
+            "Significance": "🟣",
+            "Fairness": "⚪"
+        }
+
+        for idx, (standard, score) in enumerate(paul_scores.items()):
+            col = cols[idx % 4]
+            with col:
+                if score >= 80:
+                    status, color = "✅ Excellent", "#4ECB71"
+                elif score >= 60:
+                    status, color = "👍 Good", "#F9A826"
+                else:
+                    status, color = "⚠️ Needs Work", "#FF6B6B"
+                
+                st.markdown(f"""
+                <div class="paul-card">
+                    <div class="emoji">{emojis.get(standard, '📌')}</div>
+                    <div class="standard">{standard}</div>
+                    <div class="score" style="color:{color};">{score}%</div>
+                    <div class="status">{status}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Radar Chart
+        st.markdown("#### 📊 Standards Radar Chart")
         fig_radar = graph_paul_radar(paul_scores)
         st.pyplot(fig_radar)
         plt.close()
 
         st.markdown("---")
 
-        # ── Paul's Critical Thinking Standards ──────────────────
-        st.markdown("### 📋 Paul's Critical Thinking Standards Analysis")
+        # ── Detailed Explanations ───────────────────────────────
+        st.markdown("#### 📋 Detailed Standard Analysis")
 
         top = top_results[0] if top_results else None
         bottom = top_results[-1] if top_results else None
         tscore = top['score'] if top else 0
         bscore = bottom['score'] if bottom else 0
-        top_text = top['text'] if top else ""
-        bottom_text = bottom['text'] if bottom else ""
+        top_text = top['text'][:40] + "..." if top and len(top['text']) > 40 else (top['text'] if top else "")
+        bottom_text = bottom['text'][:40] + "..." if bottom and len(bottom['text']) > 40 else (bottom['text'] if bottom else "")
 
-        standards = {
+        standards_details = {
             "🔵 Clarity": (
                 f"**Score: {paul_scores['Clarity']}%**  \n"
-                f"The user entered **{len(clean_texts)}** texts. The query was: *'{clean_texts[0]}'*.  \n"
+                f"The user entered **{len(clean_texts)}** texts. The query was: *'{clean_texts[0][:50]}...'*.  \n"
                 f"The model converted each text into a **{MODEL_DIM}-dimensional vector**.  \n"
                 f"**Cosine similarity** (0=unrelated, 1=identical) was computed for every pair.  \n"
                 f"Results are displayed as exact scores, a bar chart, a heatmap, and a PCA plot."
@@ -496,7 +619,7 @@ def main():
             ),
         }
 
-        for standard, explanation in standards.items():
+        for standard, explanation in standards_details.items():
             with st.expander(standard, expanded=True):
                 st.markdown(explanation)
 
@@ -514,13 +637,42 @@ def main():
             st.markdown(f"**Inference Time:** {elapsed_ms:.1f}ms")
 
     else:
-        # Show placeholder when no analysis
+        # ── Placeholder ──────────────────────────────────────────
         st.info("👆 Enter your texts above and click **Analyze** to see results.")
+
+        # Show feature preview
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown("""
+            <div class="card" style="text-align:center;padding:2rem 1rem;">
+                <div style="font-size:2.5rem;">📊</div>
+                <h3>Bar Chart</h3>
+                <p>Top similar words/sentences with scores</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown("""
+            <div class="card" style="text-align:center;padding:2rem 1rem;">
+                <div style="font-size:2.5rem;">🌡️</div>
+                <h3>Heatmap</h3>
+                <p>Pairwise similarity matrix</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col3:
+            st.markdown("""
+            <div class="card" style="text-align:center;padding:2rem 1rem;">
+                <div style="font-size:2.5rem;">🗺️</div>
+                <h3>2D PCA Plot</h3>
+                <p>Related terms near each other</p>
+            </div>
+            """, unsafe_allow_html=True)
 
     # ── Footer ──────────────────────────────────────────────────
     st.markdown("""
     <div class="footer">
         🔮 NLP Similarity Explorer · Model: all-MiniLM-L6-v2 · Free · No training · No preprocessing
+        <br>
+        Built for NLP Assignment · Paul's Critical Thinking Standards Applied
     </div>
     """, unsafe_allow_html=True)
 
