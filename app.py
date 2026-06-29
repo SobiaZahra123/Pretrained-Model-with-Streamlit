@@ -313,11 +313,6 @@ if run_btn:
         "App built for NLP Lab Quiz · Model: all-MiniLM-L6-v2 · "
         "No preprocessing · No training · Free pretrained model only"
     )
-APPEOF
-echo "app.py written"
-Output
 
-app.py written
-Done
 
 
