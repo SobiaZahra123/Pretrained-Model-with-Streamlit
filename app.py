@@ -206,8 +206,8 @@ cmap = plt.colormaps.get_cmap('tab10')
 cmap = plt.get_cmap('tab10')  
 colors3 = [cmap(i) for i in range(n)]
 
-    fig4 = plt.figure(figsize=(10, 7))
-    ax4  = fig4.add_subplot(111, projection='3d')
+fig4 = plt.figure(figsize=(10, 7))
+ax4  = fig4.add_subplot(111, projection='3d')
 
     for i in range(n):
         ax4.scatter(
