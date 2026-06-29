@@ -7,9 +7,7 @@ to compute and visualise text/sentence similarity — built for the NLP Lab Quiz
 
 ## 🚀 Live App
 
-👉 **[Click here to open the deployed app](https://your-app-name.streamlit.app)**  
-*(Replace this link with your Streamlit Community Cloud URL after deployment)*
-
+👉 **[Click here to open the deployed app](https://pretrained-model-with-app-7nyfthdp8mlul5bsxkunmb.streamlit.app/)**  
 ---
 
 ## 🤖 Model Used
@@ -92,9 +90,9 @@ streamlit run app.py
 
 ---
 
-## ⚙️ Deployment on Streamlit Community Cloud
+## UI
+<img width="505" height="150" alt="image" src="https://github.com/user-attachments/assets/00977fd8-6339-42c8-85c9-7b62ece459d9" />
+<img width="551" height="256" alt="image" src="https://github.com/user-attachments/assets/2bc3bd23-c0b2-4cd0-ab55-e78075cab1a8" />
+<img width="608" height="339" alt="image" src="https://github.com/user-attachments/assets/878a9037-889a-4936-9b33-7af339b5183b" />
 
-1. Push this repository to GitHub (public)  
-2. Go to [share.streamlit.io](https://share.streamlit.io)  
-3. Click **New app** → select your repo → set `app.py` as main file  
-4. Click **Deploy** — the app goes live in ~2 minutes
+
