@@ -379,24 +379,20 @@ def graph_target_plot(paul_scores):
     for i, (circle, color) in enumerate(zip(circles, colors)):
         circ = plt.Circle((0.5, 0.5), circle/2, color=color, alpha=0.15, ec='gray', linewidth=0.5)
         ax.add_patch(circ)
-        # Add labels
         if i == 0:
             ax.text(0.5, 0.5 - circle/2 - 0.05, f"{int(circle*100)}%", ha='center', va='top', fontsize=8, color='gray')
     
     # Plot the average score as a point
     target_x = 0.5
     target_y = 0.5
-    radius = avg_score / 200  # Scale to fit in 0-0.5 range
+    radius = avg_score / 200
     
-    # Draw target point
     circle = plt.Circle((target_x, target_y), radius, color='#667eea', alpha=0.7, ec='white', linewidth=2)
     ax.add_patch(circle)
     
-    # Add score text
     ax.text(target_x, target_y, f"{avg_score:.1f}%", ha='center', va='center', 
             fontsize=16, fontweight='bold', color='white')
     
-    # Add labels for each standard around the circle
     n = len(categories)
     for i, (cat, val) in enumerate(zip(categories, values)):
         angle = (i / n) * 2 * np.pi - np.pi/2
@@ -412,7 +408,6 @@ def graph_target_plot(paul_scores):
     ax.axis('off')
     ax.set_title(f"Overall Critical Thinking Score", fontsize=14, fontweight='700', color='#2d3436')
     
-    # Add subtitle
     ax.text(0.5, 0.05, f"Based on {n} Paul's Standards", ha='center', va='center', 
             fontsize=9, color='#6c757d')
     
@@ -508,7 +503,6 @@ if run_btn:
     st.markdown("### 📊 Sentence Similarity Scores")
     st.caption("Each candidate's similarity score with the query")
     
-    # Create a nice table
     score_data = []
     for r in results:
         label, color = similarity_label(r['Similarity Score'])
@@ -757,4 +751,7 @@ else:
         st.markdown("""
         <div class="card" style="text-align:center;padding:1.5rem 1rem;">
             <div style="font-size:2.5rem;">📊</div>
-            <h
+            <h4 style="margin:0.3rem 0;">Bar Chart</h4>
+            <p style="font-size:0.85rem;margin:0;">Paul's Standards Scores</p>
+        </div>
+        """, unsafe_allow_html
