@@ -1,10 +1,3 @@
-cat > /mnt/user-data/outputs/nlp_similarity_app/app.py << 'APPEOF'
-# ================================================================
-#  NLP Quiz – Text/Word Similarity App
-#  Model  : all-MiniLM-L6-v2  (free, no training, no preprocessing)
-#  Deploy : Streamlit Community Cloud
-# ================================================================
-
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
