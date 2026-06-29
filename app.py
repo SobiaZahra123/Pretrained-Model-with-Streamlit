@@ -1,3 +1,16 @@
+"""
+app.py
+======
+NLP Semantic Similarity Explorer — Main Streamlit Application
+
+Entry point for the entire app. Run with:
+    streamlit run app.py
+
+Requirements: see requirements.txt
+Model used  : sentence-transformers/all-MiniLM-L6-v2 (free, Apache 2.0)
+No preprocessing · No tokenization · No model training
+"""
+
 import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -9,11 +22,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 import pandas as pd
 import time
-import plotly.graph_objects as go
-import plotly.express as px
-from io import BytesIO
 import base64
+from io import BytesIO
 
+# ──────────────────────────────────────────────────────────────
+#  Page Configuration
+# ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="NLP Similarity Explorer",
     page_icon="🔮",
@@ -21,6 +35,9 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ──────────────────────────────────────────────────────────────
+#  Constants
+# ──────────────────────────────────────────────────────────────
 MODEL_NAME = "all-MiniLM-L6-v2"
 MODEL_DIM = 384
 MODEL_INFO = {
@@ -39,14 +56,12 @@ MODEL_INFO = {
 def inject_css():
     st.markdown("""
     <style>
-        /* ── Google Fonts ── */
         @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700&family=JetBrains+Mono&display=swap');
 
         * {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        /* ── Glassmorphism Base ── */
         .glass {
             background: rgba(255, 255, 255, 0.04);
             backdrop-filter: blur(24px) saturate(180%);
@@ -62,7 +77,6 @@ def inject_css():
             box-shadow: 0 24px 70px rgba(0,0,0,0.5);
         }
 
-        /* ── Floating blobs ── */
         .stApp {
             background: #0b0b14;
             background-image:
@@ -70,27 +84,13 @@ def inject_css():
                 radial-gradient(ellipse at 90% 80%, rgba(255, 70, 200, 0.07) 0%, transparent 60%);
         }
 
-        /* ── Score rings ── */
-        .score-ring {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            font-size: 1.4rem;
-            font-weight: 700;
-            background: conic-gradient(from 0deg, #6C63FF var(--pct), rgba(255,255,255,0.06) var(--pct));
-            color: white;
-        }
-
-        /* ── Other utilities ── */
         .mono { font-family: 'JetBrains Mono', monospace; }
         .text-muted { color: #8e8ea0; font-size: 0.9rem; }
         .divider { border: 0; border-top: 1px solid rgba(255,255,255,0.07); margin: 2rem 0; }
 
         h1, h2, h3 { color: #f0f0f8; letter-spacing: -0.02em; }
         p, li, .stMarkdown { color: #c8c8d8; }
+        
         .stButton > button {
             background: linear-gradient(135deg, #6C63FF, #5A52D5);
             color: white;
@@ -123,8 +123,6 @@ def init_session_state():
         st.session_state.current = None
     if "theme" not in st.session_state:
         st.session_state.theme = "dark"
-    if "text_inputs" not in st.session_state:
-        st.session_state.text_inputs = {}
 
 def save_to_history(texts, all_scores, primary_score, elapsed_ms):
     st.session_state.history.append({
@@ -169,21 +167,18 @@ def compute_paul_scores(primary_score, all_scores, texts):
     scores = {}
     n = len(texts)
     
-    # Clarity
     clarity = 30
     if n >= 2: clarity += 20
     if n >= 3: clarity += 20
     if primary_score > 0: clarity += 30
     scores["Clarity"] = min(clarity, 100)
     
-    # Accuracy
     accuracy = 25
     if n >= 2: accuracy += 25
     if primary_score > 0: accuracy += 25
     if len(all_scores) > 1: accuracy += 25
     scores["Accuracy"] = min(accuracy, 100)
     
-    # Precision
     precision = 10
     if primary_score > 0.7: precision += 40
     elif primary_score > 0.5: precision += 25
@@ -191,21 +186,18 @@ def compute_paul_scores(primary_score, all_scores, texts):
     if max(all_scores) - min(all_scores) > 0.3: precision += 20
     scores["Precision"] = min(precision, 100)
     
-    # Relevance
     relevance = 25
     if len(all_scores) > 0: relevance += 25
     if primary_score > 0: relevance += 25
     if n >= 2: relevance += 25
     scores["Relevance"] = min(relevance, 100)
     
-    # Logic
     logic = 15
     if primary_score > 0.5: logic += 30
     if len(all_scores) >= 2: logic += 25
     if max(all_scores) > 0 and min(all_scores) < max(all_scores): logic += 30
     scores["Logic"] = min(logic, 100)
     
-    # Significance
     significance = 10
     if primary_score > 0.7: significance += 50
     elif primary_score > 0.5: significance += 30
@@ -213,7 +205,6 @@ def compute_paul_scores(primary_score, all_scores, texts):
     if max(all_scores) > min(all_scores): significance += 20
     scores["Significance"] = min(significance, 100)
     
-    # Fairness
     fairness = 70
     if n >= 3: fairness += 15
     if len(all_scores) >= 2: fairness += 15
@@ -222,170 +213,148 @@ def compute_paul_scores(primary_score, all_scores, texts):
     return scores
 
 # ──────────────────────────────────────────────────────────────
-#  Graph Functions
+#  Graph Functions (Matplotlib only - no plotly)
 # ──────────────────────────────────────────────────────────────
 def bar_chart_top_similar(top_results):
+    """Matplotlib bar chart"""
     if not top_results:
-        return go.Figure().add_annotation(text="No data", showarrow=False)
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No data", ha='center', va='center', color='white')
+        return fig
     
-    labels = [f"{r['text']}" for r in top_results]
+    labels = [r['text'][:40] + ("..." if len(r['text']) > 40 else "") for r in top_results]
     scores = [r['score'] for r in top_results]
     colors = ['#6C63FF' if s >= 0.5 else '#FF6B6B' for s in scores]
     
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=labels[::-1],
-        x=scores[::-1],
-        orientation='h',
-        marker=dict(color=colors[::-1], cornerradius=4),
-        text=[f"{s:.4f}" for s in scores[::-1]],
-        textposition='outside',
-        hovertemplate='<b>%{y}</b><br>Score: %{x:.4f}<extra></extra>'
-    ))
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#C0C0D0'),
-        xaxis=dict(title='Cosine Similarity', range=[0, 1], gridcolor='rgba(255,255,255,0.07)'),
-        yaxis=dict(gridcolor='rgba(255,255,255,0.07)'),
-        height=400,
-        margin=dict(l=10, r=40, t=10, b=10),
-        showlegend=False,
-        transition=dict(duration=500),
-    )
+    fig, ax = plt.subplots(figsize=(10, 5))
+    bars = ax.barh(labels[::-1], scores[::-1], color=colors[::-1], edgecolor='white', height=0.6)
+    ax.set_xlabel("Cosine Similarity Score", fontsize=11, color='white')
+    ax.set_title("Top Similarity Scores", fontsize=14, fontweight='700', color='white')
+    ax.set_xlim(0, 1)
+    ax.set_facecolor('#1a1a2e')
+    fig.patch.set_facecolor('#0b0b14')
+    ax.tick_params(colors='white')
+    
+    for bar, score in zip(bars, scores[::-1]):
+        ax.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height()/2,
+                f"{score:.4f}", va='center', fontsize=9, color='white')
+    ax.axvline(0.5, color='gray', linestyle='--', linewidth=1, alpha=0.5, label='0.5 threshold')
+    ax.legend(loc='lower right', fontsize=9, facecolor='#1a1a2e', edgecolor='white')
+    plt.tight_layout()
     return fig
 
 def heatmap_similarity(matrix, texts):
-    fig = go.Figure(data=go.Heatmap(
-        z=matrix,
-        x=[f"#{i+1}" for i in range(len(texts))],
-        y=[f"#{i+1}" for i in range(len(texts))],
-        text=[[f"{matrix[i][j]:.4f}" for j in range(len(texts))] for i in range(len(texts))],
-        texttemplate='%{text}',
-        textfont=dict(size=10, color='white'),
-        colorscale='Viridis',
-        zmin=0, zmax=1,
-        hoverongaps=False,
-    ))
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#C0C0D0'),
-        xaxis=dict(title='Text #', gridcolor='rgba(255,255,255,0.07)'),
-        yaxis=dict(title='Text #', gridcolor='rgba(255,255,255,0.07)'),
-        height=450,
-        margin=dict(l=10, r=10, t=10, b=10),
-    )
+    """Matplotlib heatmap"""
+    fig, ax = plt.subplots(figsize=(8, 6))
+    im = ax.imshow(matrix, cmap='viridis', vmin=0, vmax=1)
+    ax.set_xticks(range(len(texts)))
+    ax.set_yticks(range(len(texts)))
+    ax.set_xticklabels([f"T{i+1}" for i in range(len(texts))], color='white')
+    ax.set_yticklabels([f"T{i+1}" for i in range(len(texts))], color='white')
+    ax.set_title("Pairwise Similarity Heatmap", fontsize=14, fontweight='700', color='white')
+    fig.patch.set_facecolor('#0b0b14')
+    ax.set_facecolor('#1a1a2e')
+    
+    for i in range(len(texts)):
+        for j in range(len(texts)):
+            ax.text(j, i, f"{matrix[i][j]:.2f}", ha='center', va='center', color='white', fontsize=9)
+    
+    plt.colorbar(im, ax=ax, label='Similarity Score')
+    plt.tight_layout()
     return fig
 
 def pca_scatter(embeddings, texts):
+    """Matplotlib PCA scatter plot"""
     pca = PCA(n_components=2, random_state=42)
     coords = pca.fit_transform(embeddings)
     
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=coords[:, 0],
-        y=coords[:, 1],
-        mode='markers+text',
-        marker=dict(
-            size=15,
-            color=[f'#{i:02x}{i:02x}{255-(i*20):02x}' for i in range(len(texts))],
-            line=dict(width=2, color='white'),
-        ),
-        text=[f"#{i+1}" for i in range(len(texts))],
-        textposition='top center',
-        hovertemplate='<b>%{text}</b><br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>',
-    ))
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#C0C0D0'),
-        xaxis=dict(title=f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)', gridcolor='rgba(255,255,255,0.07)'),
-        yaxis=dict(title=f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)', gridcolor='rgba(255,255,255,0.07)'),
-        height=500,
-        margin=dict(l=10, r=10, t=10, b=10),
-    )
+    fig, ax = plt.subplots(figsize=(9, 6))
+    colors = ['#6C63FF' if i == 0 else '#4ECB71' for i in range(len(texts))]
+    sizes = [150 if i == 0 else 100 for i in range(len(texts))]
+    
+    scatter = ax.scatter(coords[:, 0], coords[:, 1], c=colors, s=sizes, edgecolors='white', linewidths=1.5)
+    ax.set_title("2D PCA Embedding Projection", fontsize=14, fontweight='700', color='white')
+    ax.set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)", fontsize=10, color='white')
+    ax.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)", fontsize=10, color='white')
+    ax.set_facecolor('#1a1a2e')
+    fig.patch.set_facecolor('#0b0b14')
+    ax.tick_params(colors='white')
+    ax.grid(True, alpha=0.2, color='gray')
+    
+    for i, label in enumerate(texts):
+        label_short = label[:20] + ("..." if len(label) > 20 else "")
+        ax.annotate(f"{i+1}. {label_short}", (coords[i, 0], coords[i, 1]),
+                   textcoords="offset points", xytext=(8, 5), fontsize=8, color='white')
+    
+    plt.tight_layout()
     return fig
 
 def radar_chart(scores):
+    """Matplotlib radar chart"""
     if not scores:
-        return go.Figure().add_annotation(text="No data", showarrow=False)
+        fig, ax = plt.subplots(figsize=(6, 6))
+        ax.text(0.5, 0.5, "No data", ha='center', va='center', color='white')
+        return fig
     
     categories = list(scores.keys())
     values = list(scores.values())
     values += values[:1]
+    angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False).tolist()
+    angles += angles[:1]
     
-    fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(
-        r=values,
-        theta=categories + [categories[0]],
-        fill='toself',
-        line=dict(color='#6C63FF', width=3),
-        fillcolor='rgba(108, 99, 255, 0.25)',
-        name='Paul\'s Scores',
-    ))
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(visible=True, range=[0, 100], gridcolor='rgba(255,255,255,0.07)'),
-            angularaxis=dict(gridcolor='rgba(255,255,255,0.07)'),
-        ),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#C0C0D0'),
-        height=400,
-        margin=dict(l=10, r=10, t=10, b=10),
-        showlegend=False,
-    )
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(projection='polar'))
+    ax.plot(angles, values, 'o-', linewidth=2, color='#6C63FF')
+    ax.fill(angles, values, alpha=0.25, color='#6C63FF')
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(categories, color='white')
+    ax.set_ylim(0, 100)
+    ax.set_yticks([20, 40, 60, 80, 100])
+    ax.set_yticklabels(['20', '40', '60', '80', '100'], color='white')
+    ax.set_title("Paul's Critical Thinking Standards", fontsize=14, fontweight='700', color='white')
+    ax.set_facecolor('#1a1a2e')
+    fig.patch.set_facecolor('#0b0b14')
+    ax.grid(True, color='gray', alpha=0.3)
+    plt.tight_layout()
     return fig
 
 def gauge_chart(score):
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=score,
-        title=dict(text="Similarity Score", font=dict(color='#C0C0D0', size=16)),
-        gauge=dict(
-            axis=dict(range=[0, 1], tickcolor='#C0C0D0'),
-            bar=dict(color='#6C63FF'),
-            steps=[
-                dict(range=[0, 0.35], color='rgba(255,107,107,0.3)'),
-                dict(range=[0.35, 0.65], color='rgba(249,168,38,0.3)'),
-                dict(range=[0.65, 1], color='rgba(78,203,113,0.3)'),
-            ],
-            threshold=dict(
-                line=dict(color='#FF6B6B', width=4),
-                thickness=0.75,
-                value=0.5,
-            ),
-        ),
-        number=dict(font=dict(color='white', size=40)),
-    ))
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#C0C0D0'),
-        height=300,
-        margin=dict(l=10, r=10, t=10, b=10),
-    )
+    """Matplotlib gauge chart"""
+    fig, ax = plt.subplots(figsize=(6, 3))
+    
+    # Background bar
+    ax.barh(0, 1, height=0.3, color='#2a2a3e', alpha=0.5)
+    
+    # Colored bar based on score
+    color = '#6C63FF' if score >= 0.5 else '#FF6B6B'
+    ax.barh(0, score, height=0.3, color=color, edgecolor='white', linewidth=1)
+    
+    # Add marker
+    ax.axvline(score, color='white', linestyle='--', linewidth=1, alpha=0.7)
+    
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-1, 1)
+    ax.set_xlabel('Similarity Score', fontsize=10, color='white')
+    ax.set_title(f'Score: {score:.4f}', fontsize=14, fontweight='700', color='white')
+    ax.set_yticks([])
+    ax.set_facecolor('#1a1a2e')
+    fig.patch.set_facecolor('#0b0b14')
+    ax.tick_params(colors='white')
+    ax.grid(True, alpha=0.2, axis='x', color='gray')
+    plt.tight_layout()
     return fig
 
 def distribution_chart(scores):
-    fig = go.Figure()
-    fig.add_trace(go.Histogram(
-        x=scores,
-        nbinsx=10,
-        marker=dict(color='#6C63FF', line=dict(width=1, color='white')),
-        hovertemplate='Score: %{x:.3f}<br>Count: %{y}<extra></extra>',
-    ))
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#C0C0D0'),
-        xaxis=dict(title='Similarity Score', gridcolor='rgba(255,255,255,0.07)'),
-        yaxis=dict(title='Count', gridcolor='rgba(255,255,255,0.07)'),
-        height=300,
-        margin=dict(l=10, r=10, t=10, b=10),
-        showlegend=False,
-    )
+    """Matplotlib distribution histogram"""
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.hist(scores, bins=10, color='#6C63FF', edgecolor='white', alpha=0.7)
+    ax.set_xlabel('Similarity Score', fontsize=10, color='white')
+    ax.set_ylabel('Frequency', fontsize=10, color='white')
+    ax.set_title('Score Distribution', fontsize=14, fontweight='700', color='white')
+    ax.set_facecolor('#1a1a2e')
+    fig.patch.set_facecolor('#0b0b14')
+    ax.tick_params(colors='white')
+    ax.grid(True, alpha=0.2, color='gray')
+    plt.tight_layout()
     return fig
 
 # ──────────────────────────────────────────────────────────────
@@ -410,13 +379,6 @@ def render_sidebar():
             key="sidebar_nav",
             label_visibility="collapsed",
         )
-        
-        st.markdown("---")
-        
-        # Theme toggle
-        theme = st.toggle("🌙 Dark Mode", value=True, key="theme_toggle")
-        if theme != st.session_state.theme:
-            st.session_state.theme = "dark" if theme else "light"
         
         st.markdown("---")
         st.caption("⚡ `all-MiniLM-L6-v2`")
@@ -718,4 +680,27 @@ def main():
             top_results.sort(key=lambda x: x['score'], reverse=True)
             top_results = top_results[:top_k]
             
-            paul_scores = compute_paul
+            paul_scores = compute_paul_scores(primary_score, all_scores, clean_texts)
+            
+            st.session_state.current = {
+                "texts": clean_texts,
+                "embeddings": embeddings,
+                "matrix": matrix,
+                "all_scores": all_scores,
+                "top_results": top_results,
+                "paul_scores": paul_scores,
+                "primary_score": primary_score,
+                "label": label,
+                "elapsed_ms": elapsed_ms,
+            }
+            
+            render_success_banner(primary_score, label)
+            render_metrics(primary_score, label, color, len(clean_texts), elapsed_ms, MODEL_DIM)
+            animated_divider()
+            
+            col_g, col_m = st.columns([1.4, 1])
+            with col_g:
+                st.markdown("#### 🏆 Top Similar Results")
+                render_top_results(top_results)
+            with col_m:
+                st.mark
