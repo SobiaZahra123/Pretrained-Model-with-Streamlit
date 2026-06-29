@@ -406,7 +406,7 @@ def graph_target_plot(paul_scores):
     ax.set_ylim(0, 1)
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title(f"Overall Critical Thinking Score", fontsize=14, fontweight='700', color='#2d3436')
+    ax.set_title("Overall Critical Thinking Score", fontsize=14, fontweight='700', color='#2d3436')
     
     ax.text(0.5, 0.05, f"Based on {n} Paul's Standards", ha='center', va='center', 
             fontsize=9, color='#6c757d')
@@ -733,13 +733,13 @@ if run_btn:
     st.markdown("### ℹ️ Model Information")
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f"**Model:** `all-MiniLM-L6-v2`")
-        st.markdown(f"**Dimension:** 384")
-        st.markdown(f"**License:** Apache 2.0")
+        st.markdown("**Model:** `all-MiniLM-L6-v2`")
+        st.markdown("**Dimension:** 384")
+        st.markdown("**License:** Apache 2.0")
     with col2:
-        st.markdown(f"**Framework:** Sentence-Transformers")
-        st.markdown(f"**Type:** Free pretrained embedding model")
-        st.markdown(f"**Max Tokens:** 512")
+        st.markdown("**Framework:** Sentence-Transformers")
+        st.markdown("**Type:** Free pretrained embedding model")
+        st.markdown("**Max Tokens:** 512")
 
 else:
     # ── Placeholder ──────────────────────────────────────────────
@@ -754,4 +754,6 @@ else:
             <h4 style="margin:0.3rem 0;">Bar Chart</h4>
             <p style="font-size:0.85rem;margin:0;">Paul's Standards Scores</p>
         </div>
-        """,
+        """, unsafe_allow_html=True)
+    with col2:
+        st.mark
