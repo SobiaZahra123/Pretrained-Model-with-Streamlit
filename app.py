@@ -754,5 +754,4 @@ else:
             <h4 style="margin:0.3rem 0;">Bar Chart</h4>
             <p style="font-size:0.85rem;margin:0;">Paul's Standards Scores</p>
         </div>
-        """, unsafe_allow_html=True)
-    with col2
+        """,
